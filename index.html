@@ -283,7 +283,8 @@
           });
 
           if (!res.ok) {
-            throw new Error(`Ошибка API (VPN выключен или ключ неверный)`);
+          const errorText = await res.text();
+          throw new Error(`Ошибка от Google (Код ${res.status}): ${errorText}`);
           }
 
           const data = await res.json();
