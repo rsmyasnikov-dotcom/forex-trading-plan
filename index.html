@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Forex Trading Plan - Professional Analysis</title>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://unpkg.com/recharts/umd/Recharts.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        .font-mono { font-family: 'JetBrains Mono', monospace; }
+    </style>
+</head>
+<body class="bg-slate-950">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState } = React;
+        const { TrendingDown, TrendingUp, Activity, DollarSign, AlertTriangle, BarChart3, Info } = lucide;
+        const { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } = Recharts;
+
+        const ANALYSIS_DATA = {"pair": "EUR/USD", "currentPrice": 1.15221, "timestamp": "2026-04-03 21:00:00+00:00", "trend": {"d1": "downtrend", "h4": "range", "bias": "bearish"}, "levels": {"support": [1.14591, 1.15237, 1.15808], "resistance": [1.14929, 1.15847], "nearestSupport": 1.14591, "nearestResistance": 1.15847}, "dxy": {"current": 100.031, "trend": "uptrend", "bias": "bullish", "correlation": -0.988}, "atr": 0.00077, "dailyRange": {"high": 1.15513, "low": 1.15168, "range": 0.00346}, "recommendation": {"action": "NO_TRADE", "confidence": "medium", "direction": "bearish", "entry": 1.15321, "stopLoss": 1.15513, "tp1": 1.15051, "tp2": 1.14897, "rr1": 1.4, "rr2": 2.2}, "chartData": [{"date": "2026-03-30 18:00", "open": 1.1460003853, "high": 1.1469204426, "low": 1.1460003853, "close": 1.146525979}, {"date": "2026-03-30 19:00", "open": 1.1463946104, "high": 1.146525979, "low": 1.1458691359, "close": 1.1461317539}, {"date": "2026-03-30 20:00", "open": 1.1462632418, "high": 1.146525979, "low": 1.1460003853, "close": 1.146525979}, {"date": "2026-03-30 21:00", "open": 1.1461317539, "high": 1.1471836567, "low": 1.1458691359, "close": 1.1466574669}, {"date": "2026-03-30 22:00", "open": 1.1463946104, "high": 1.1469204426, "low": 1.1463946104, "close": 1.1463946104}, {"date": "2026-03-30 23:00", "open": 1.1461317539, "high": 1.1461317539, "low": 1.145606637, "close": 1.1458691359}, {"date": "2026-03-31 00:00", "open": 1.1460003853, "high": 1.1479737759, "low": 1.1452130079, "close": 1.1479737759}, {"date": "2026-03-31 01:00", "open": 1.1478420496, "high": 1.1492931843, "low": 1.1477103233, "close": 1.1479737759}, {"date": "2026-03-31 02:00", "open": 1.1478420496, "high": 1.1482374668, "low": 1.1477103233, "close": 1.1479737759}, {"date": "2026-03-31 03:00", "open": 1.1479737759, "high": 1.1479737759, "low": 1.1470520496, "close": 1.1473152637}, {"date": "2026-03-31 04:00", "open": 1.1473152637, "high": 1.1475785971, "low": 1.1473152637, "close": 1.1473152637}, {"date": "2026-03-31 05:00", "open": 1.1473152637, "high": 1.1474468708, "low": 1.1466574669, "close": 1.1466574669}, {"date": "2026-03-31 06:00", "open": 1.1467890739, "high": 1.1477103233, "low": 1.1463946104, "close": 1.1475785971}, {"date": "2026-03-31 07:00", "open": 1.1474468708, "high": 1.1475785971, "low": 1.1467890739, "close": 1.1475785971}, {"date": "2026-03-31 08:00", "open": 1.1475785971, "high": 1.1478420496, "low": 1.1467890739, "close": 1.1471836567}, {"date": "2026-03-31 09:00", "open": 1.1470520496, "high": 1.1475785971, "low": 1.146525979, "close": 1.1470520496}, {"date": "2026-03-31 10:00", "open": 1.1471836567, "high": 1.1473152637, "low": 1.1461317539, "close": 1.1462632418}, {"date": "2026-03-31 11:00", "open": 1.1462632418, "high": 1.1494252682, "low": 1.1461317539, "close": 1.1491611004}, {"date": "2026-03-31 12:00", "open": 1.1495574713, "high": 1.1512778997, "low": 1.1492931843, "close": 1.1507480145}, {"date": "2026-03-31 13:00", "open": 1.1507480145, "high": 1.1535356045, "low": 1.1504832506, "close": 1.1534025669}, {"date": "2026-03-31 14:00", "open": 1.153668642, "high": 1.1542012691, "low": 1.1515431404, "close": 1.1524720192}, {"date": "2026-03-31 15:00", "open": 1.1524720192, "high": 1.153668642, "low": 1.1515431404, "close": 1.151941061}, {"date": "2026-03-31 16:00", "open": 1.151941061, "high": 1.1560693979, "low": 1.1518083811, "close": 1.1543345451}, {"date": "2026-03-31 17:00", "open": 1.1546010971, "high": 1.1558021307, "low": 1.1546010971, "close": 1.1546010971}, {"date": "2026-03-31 18:00", "open": 1.1543345451, "high": 1.1552680731, "low": 1.1543345451, "close": 1.1550011635}, {"date": "2026-03-31 19:00", "open": 1.1547343731, "high": 1.1563367844, "low": 1.1543345451, "close": 1.1563367844}, {"date": "2026-03-31 20:00", "open": 1.1563367844, "high": 1.1566041708, "low": 1.1556684971, "close": 1.1556684971}, {"date": "2026-03-31 21:00", "open": 1.1558021307, "high": 1.1560693979, "low": 1.1550011635, "close": 1.1558021307}, {"date": "2026-03-31 22:00", "open": 1.1560693979, "high": 1.1563367844, "low": 1.1556684971, "close": 1.1562030315}, {"date": "2026-03-31 23:00", "open": 1.1562030315, "high": 1.1576753855, "low": 1.1560693979, "close": 1.1576753855}, {"date": "2026-04-01 00:00", "open": 1.1576753855, "high": 1.1582117081, "low": 1.157273531, "close": 1.1578094959}, {"date": "2026-04-01 01:00", "open": 1.1576753855, "high": 1.1576753855, "low": 1.1559356451, "close": 1.156470418}, {"date": "2026-04-01 02:00", "open": 1.1566041708, "high": 1.157407403, "low": 1.156470418, "close": 1.157273531}, {"date": "2026-04-01 03:00", "open": 1.1571395397, "high": 1.1571395397, "low": 1.1563367844, "close": 1.156470418}, {"date": "2026-04-01 04:00", "open": 1.1563367844, "high": 1.1570056677, "low": 1.1563367844, "close": 1.1568717957}, {"date": "2026-04-01 05:00", "open": 1.1568717957, "high": 1.1579434872, "low": 1.1568717957, "close": 1.157407403}, {"date": "2026-04-01 06:00", "open": 1.157273531, "high": 1.1595547199, "low": 1.1566041708, "close": 1.1594202518}, {"date": "2026-04-01 07:00", "open": 1.1595547199, "high": 1.1600928307, "low": 1.1582117081, "close": 1.1586142778}, {"date": "2026-04-01 08:00", "open": 1.1584800482, "high": 1.161440134, "low": 1.1580775976, "close": 1.1600928307}, {"date": "2026-04-01 09:00", "open": 1.1599582434, "high": 1.1604967117, "low": 1.1584800482, "close": 1.1598236561}, {"date": "2026-04-01 10:00", "open": 1.1598236561, "high": 1.1607661247, "low": 1.159689188, "close": 1.1603620052}, {"date": "2026-04-01 11:00", "open": 1.1602274179, "high": 1.1613053083, "low": 1.1602274179, "close": 1.1610356569}, {"date": "2026-04-01 12:00", "open": 1.1611704826, "high": 1.1619800329, "low": 1.1598236561, "close": 1.1606314182}, {"date": "2026-04-01 13:00", "open": 1.1607661247, "high": 1.162655592, "low": 1.1603620052, "close": 1.161440134}, {"date": "2026-04-01 14:00", "open": 1.1610356569, "high": 1.1630612612, "low": 1.1609008312, "close": 1.1627906561}, {"date": "2026-04-01 15:00", "open": 1.162655592, "high": 1.1629259586, "low": 1.1609008312, "close": 1.1617100239}, {"date": "2026-04-01 16:00", "open": 1.1617100239, "high": 1.162250042, "low": 1.1607661247, "close": 1.162250042}, {"date": "2026-04-01 17:00", "open": 1.162250042, "high": 1.1625204086, "low": 1.1598236561, "close": 1.1598236561}, {"date": "2026-04-01 18:00", "open": 1.159689188, "high": 1.159689188, "low": 1.1582117081, "close": 1.1584800482}, {"date": "2026-04-01 19:00", "open": 1.1580775976, "high": 1.1590172052, "low": 1.1580775976, "close": 1.1588828564}, {"date": "2026-04-01 20:00", "open": 1.1588828564, "high": 1.1595547199, "low": 1.1586142778, "close": 1.1595547199}, {"date": "2026-04-01 21:00", "open": 1.1591515541, "high": 1.1598236561, "low": 1.1584800482, "close": 1.1594202518}, {"date": "2026-04-01 22:00", "open": 1.1594202518, "high": 1.159689188, "low": 1.1591515541, "close": 1.1594202518}, {"date": "2026-04-01 23:00", "open": 1.1595547199, "high": 1.1598236561, "low": 1.1592857838, "close": 1.1592857838}, {"date": "2026-04-02 00:00", "open": 1.1592857838, "high": 1.1600928307, "low": 1.1590172052, "close": 1.1600928307}, {"date": "2026-04-02 01:00", "open": 1.1599582434, "high": 1.1606314182, "low": 1.1550011635, "close": 1.1555349827}, {"date": "2026-04-02 02:00", "open": 1.1555349827, "high": 1.1563367844, "low": 1.1547343731, "close": 1.1551345587}, {"date": "2026-04-02 03:00", "open": 1.1548677683, "high": 1.1552680731, "low": 1.1542012691, "close": 1.1543345451}, {"date": "2026-04-02 04:00", "open": 1.1543345451, "high": 1.1544678211, "low": 1.153668642, "close": 1.1539349556}, {"date": "2026-04-02 05:00", "open": 1.1542012691, "high": 1.1542012691, "low": 1.1528706551, "close": 1.1528706551}, {"date": "2026-04-02 06:00", "open": 1.1532695293, "high": 1.1539349556, "low": 1.151941061, "close": 1.1539349556}, {"date": "2026-04-02 07:00", "open": 1.1538017988, "high": 1.1539349556, "low": 1.1522064209, "close": 1.153668642}, {"date": "2026-04-02 08:00", "open": 1.153668642, "high": 1.1538017988, "low": 1.1527377367, "close": 1.1528706551}, {"date": "2026-04-02 09:00", "open": 1.1528706551, "high": 1.1534025669, "low": 1.1526048183, "close": 1.1527377367}, {"date": "2026-04-02 10:00", "open": 1.1528706551, "high": 1.1528706551, "low": 1.1515431404, "close": 1.1515431404}, {"date": "2026-04-02 11:00", "open": 1.1516757011, "high": 1.1522064209, "low": 1.1512778997, "close": 1.1522064209}, {"date": "2026-04-02 12:00", "open": 1.1522064209, "high": 1.1534025669, "low": 1.1522064209, "close": 1.1527377367}, {"date": "2026-04-02 13:00", "open": 1.1527377367, "high": 1.1534025669, "low": 1.15233922, "close": 1.1534025669}, {"date": "2026-04-02 14:00", "open": 1.1532695293, "high": 1.1558021307, "low": 1.1531364918, "close": 1.1555349827}, {"date": "2026-04-02 15:00", "open": 1.1556684971, "high": 1.1560693979, "low": 1.1547343731, "close": 1.1548677683}, {"date": "2026-04-02 16:00", "open": 1.1548677683, "high": 1.1550011635, "low": 1.1543345451, "close": 1.1546010971}, {"date": "2026-04-02 17:00", "open": 1.1543345451, "high": 1.1551345587, "low": 1.1540681124, "close": 1.1540681124}, {"date": "2026-04-02 18:00", "open": 1.1542012691, "high": 1.1542012691, "low": 1.153668642, "close": 1.1542012691}, {"date": "2026-04-02 19:00", "open": 1.1540681124, "high": 1.1544678211, "low": 1.1538017988, "close": 1.1538017988}, {"date": "2026-04-02 20:00", "open": 1.153668642, "high": 1.1543345451, "low": 1.153668642, "close": 1.1542012691}, {"date": "2026-04-02 21:00", "open": 1.1543345451, "high": 1.1546010971, "low": 1.153668642, "close": 1.1546010971}, {"date": "2026-04-02 22:00", "open": 1.1547343731, "high": 1.1547343731, "low": 1.1542012691, "close": 1.1543345451}, {"date": "2026-04-02 23:00", "open": 1.1543345451, "high": 1.1546010971, "low": 1.1543345451, "close": 1.1544678211}, {"date": "2026-04-03 00:00", "open": 1.1544678211, "high": 1.1547343731, "low": 1.1542012691, "close": 1.1542012691}, {"date": "2026-04-03 01:00", "open": 1.1542012691, "high": 1.1543345451, "low": 1.1538017988, "close": 1.1538017988}, {"date": "2026-04-03 02:00", "open": 1.1538017988, "high": 1.1542012691, "low": 1.1535356045, "close": 1.1539349556}, {"date": "2026-04-03 03:00", "open": 1.1539349556, "high": 1.1540681124, "low": 1.1538017988, "close": 1.1539349556}, {"date": "2026-04-03 04:00", "open": 1.1539349556, "high": 1.1539349556, "low": 1.1538017988, "close": 1.1538017988}, {"date": "2026-04-03 05:00", "open": 1.1538017988, "high": 1.1542012691, "low": 1.1532695293, "close": 1.1542012691}, {"date": "2026-04-03 06:00", "open": 1.1540681124, "high": 1.1543345451, "low": 1.1538017988, "close": 1.1543345451}, {"date": "2026-04-03 07:00", "open": 1.1543345451, "high": 1.1550011635, "low": 1.1543345451, "close": 1.1546010971}, {"date": "2026-04-03 08:00", "open": 1.1546010971, "high": 1.1548677683, "low": 1.1543345451, "close": 1.1546010971}, {"date": "2026-04-03 09:00", "open": 1.1547343731, "high": 1.1548677683, "low": 1.1544678211, "close": 1.1546010971}, {"date": "2026-04-03 10:00", "open": 1.1547343731, "high": 1.1551345587, "low": 1.1546010971, "close": 1.1548677683}, {"date": "2026-04-03 11:00", "open": 1.1548677683, "high": 1.1550011635, "low": 1.1544678211, "close": 1.1547343731}, {"date": "2026-04-03 12:00", "open": 1.1548677683, "high": 1.1548677683, "low": 1.1526048183, "close": 1.1534025669}, {"date": "2026-04-03 13:00", "open": 1.1532695293, "high": 1.1542012691, "low": 1.1531364918, "close": 1.1539349556}, {"date": "2026-04-03 14:00", "open": 1.1539349556, "high": 1.1539349556, "low": 1.1524720192, "close": 1.1524720192}, {"date": "2026-04-03 15:00", "open": 1.1524720192, "high": 1.1531364918, "low": 1.1524720192, "close": 1.1524720192}, {"date": "2026-04-03 16:00", "open": 1.1524720192, "high": 1.1524720192, "low": 1.152073741, "close": 1.15233922}, {"date": "2026-04-03 17:00", "open": 1.1522064209, "high": 1.1524720192, "low": 1.152073741, "close": 1.1522064209}, {"date": "2026-04-03 18:00", "open": 1.15233922, "high": 1.15233922, "low": 1.1516757011, "close": 1.1518083811}, {"date": "2026-04-03 19:00", "open": 1.1518083811, "high": 1.152073741, "low": 1.1518083811, "close": 1.151941061}, {"date": "2026-04-03 20:00", "open": 1.151941061, "high": 1.1532695293, "low": 1.1518083811, "close": 1.1522064209}, {"date": "2026-04-03 21:00", "open": 1.15233922, "high": 1.15233922, "low": 1.1522064209, "close": 1.1522064209}]};
+
+        const ForexTradingPlan = () => {
+            const [selectedPair, setSelectedPair] = useState('EUR/USD');
+            const data = ANALYSIS_DATA;
+
+            const getTrendColor = (trend) => {
+                if (trend === 'bullish' || trend === 'uptrend') return 'text-emerald-400';
+                if (trend === 'bearish' || trend === 'downtrend') return 'text-rose-400';
+                return 'text-amber-400';
+            };
+
+            const getTrendBg = (trend) => {
+                if (trend === 'bullish' || trend === 'uptrend') return 'bg-emerald-500/10 border-emerald-500/30';
+                if (trend === 'bearish' || trend === 'downtrend') return 'bg-rose-500/10 border-rose-500/30';
+                return 'bg-amber-500/10 border-amber-500/30';
+            };
+
+            const formatNumber = (num) => {
+                if (num === null || num === undefined) return '-';
+                return num.toFixed(5);
+            };
+
+            return (
+                <div className="min-h-screen bg-slate-950 text-slate-100 p-4 md:p-6">
+                    <header className="mb-8">
+                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                            <div>
+                                <h1 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent">
+                                    Forex Trading Plan
+                                </h1>
+                                <p className="text-slate-400 mt-1">Professional Day Trading Analysis</p>
+                            </div>
+                            <select 
+                                value={selectedPair}
+                                onChange={(e) => setSelectedPair(e.target.value)}
+                                className="bg-slate-900 border border-slate-700 rounded-lg px-4 py-2 text-sm"
+                            >
+                                <option>EUR/USD</option>
+                            </select>
+                        </div>
+                    </header>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        <div className="space-y-6">
+                            <div className="bg-slate-900/50 border border-slate-800 rounded-2xl p-6">
+                                <div className="flex items-center justify-between mb-4">
+                                    <span className="text-slate-400 text-sm">Current Price</span>
+                                    <Activity className="w-4 h-4 text-blue-400" />
+                                </div>
+                                <div className="text-4xl font-mono font-bold text-white">{data.currentPrice}</div>
+                                <div className="mt-3 pt-3 border-t border-slate-800">
+                                    <div className="flex justify-between text-sm">
+                                        <span className="text-slate-400">ATR(14):</span>
+                                        <span className="font-mono text-blue-400">{data.atr}</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="bg-slate-900/50 border border-slate-800 rounded-2xl p-6">
+                                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                                    <BarChart3 className="w-5 h-5 text-blue-400" />
+                                    Trend Analysis
+                                </h3>
+                                <div className="space-y-3">
+                                    <div className={`p-3 rounded-lg border ${getTrendBg(data.trend.d1)}`}>
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-sm font-medium">D1 Timeframe</span>
+                                            <span className={`font-bold ${getTrendColor(data.trend.bias)}`}>
+                                                {data.trend.bias.toUpperCase()}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div className={`p-3 rounded-lg border ${getTrendBg(data.trend.h4)}`}>
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-sm font-medium">H4 Timeframe</span>
+                                            <span className={`font-bold ${getTrendColor(data.trend.h4)}`}>
+                                                {data.trend.h4.toUpperCase()}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="bg-slate-900/50 border border-slate-800 rounded-2xl p-6">
+                                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                                    <DollarSign className="w-5 h-5 text-green-400" />
+                                    Dollar Index (DXY)
+                                </h3>
+                                <div className="text-2xl font-mono font-bold">{data.dxy.current}</div>
+                                <div className={`text-lg font-bold ${getTrendColor(data.dxy.bias)}`}>
+                                    {data.dxy.bias.toUpperCase()}
+                                </div>
+                                <div className="mt-3 pt-3 border-t border-slate-800">
+                                    <div className="flex justify-between text-sm">
+                                        <span className="text-slate-400">Correlation:</span>
+                                        <span className="font-mono text-red-400">{data.dxy.correlation}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="lg:col-span-2 space-y-6">
+                            <div className={`rounded-2xl p-6 border-2 ${
+                                data.recommendation.action === 'NO_TRADE' 
+                                    ? 'bg-slate-900/50 border-slate-700' 
+                                    : 'bg-rose-950/30 border-rose-500/50'
+                            }`}>
+                                <div className="flex items-center justify-between mb-6">
+                                    <h2 className="text-2xl font-bold">Trading Recommendation</h2>
+                                    <div className={`px-4 py-2 rounded-full text-sm font-bold ${
+                                        data.recommendation.action === 'NO_TRADE'
+                                            ? 'bg-slate-700 text-slate-300'
+                                            : 'bg-rose-500 text-white'
+                                    }`}>
+                                        {data.recommendation.action === 'NO_TRADE' ? 'NO TRADE' : data.recommendation.action.replace('_', ' ')}
+                                    </div>
+                                </div>
+
+                                {data.recommendation.action === 'NO_TRADE' ? (
+                                    <div className="flex items-center gap-4 p-4 rounded-xl bg-slate-950/50 border border-slate-800">
+                                        <AlertTriangle className="w-8 h-8 text-amber-400" />
+                                        <div>
+                                            <div className="font-semibold text-amber-400">No Trade Setup</div>
+                                            <div className="text-sm text-slate-400">
+                                                D1 bearish but H4 consolidating. Insufficient RR ratio for entry.
+                                                Waiting for better setup at key resistance level.
+                                            </div>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                        <div className="bg-slate-950/50 rounded-xl p-4 border border-slate-800">
+                                            <div className="text-xs text-slate-400 mb-1">Entry (Limit)</div>
+                                            <div className="text-xl font-mono font-bold text-blue-400">
+                                                {formatNumber(data.recommendation.entry)}
+                                            </div>
+                                        </div>
+                                        <div className="bg-slate-950/50 rounded-xl p-4 border border-slate-800">
+                                            <div className="text-xs text-slate-400 mb-1">Stop Loss</div>
+                                            <div className="text-xl font-mono font-bold text-rose-400">
+                                                {formatNumber(data.recommendation.stopLoss)}
+                                            </div>
+                                        </div>
+                                        <div className="bg-slate-950/50 rounded-xl p-4 border border-slate-800">
+                                            <div className="text-xs text-slate-400 mb-1">TP1</div>
+                                            <div className="text-xl font-mono font-bold text-emerald-400">
+                                                {formatNumber(data.recommendation.tp1)}
+                                            </div>
+                                        </div>
+                                        <div className="bg-slate-950/50 rounded-xl p-4 border border-slate-800">
+                                            <div className="text-xs text-slate-400 mb-1">TP2</div>
+                                            <div className="text-xl font-mono font-bold text-emerald-400">
+                                                {formatNumber(data.recommendation.tp2)}
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="bg-slate-900/50 border border-slate-800 rounded-2xl p-6">
+                                <h3 className="text-lg font-semibold mb-4">Price Action (H1)</h3>
+                                <div className="h-64">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <LineChart data={data.chartData}>
+                                            <XAxis dataKey="date" hide />
+                                            <YAxis domain={['dataMin - 0.005', 'dataMax + 0.005']} tickFormatter={(val) => val.toFixed(4)} tick={{fill: '#64748b', fontSize: 10}} />
+                                            <Tooltip contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #1e293b', borderRadius: '8px' }} formatter={(value) => [Number(value).toFixed(5), 'Price']} />
+                                            <ReferenceLine y={data.levels.nearestResistance} stroke="#f43f5e" strokeDasharray="3 3" label={{ value: 'Resistance', fill: '#f43f5e', fontSize: 10, position: 'right' }} />
+                                            <ReferenceLine y={data.levels.nearestSupport} stroke="#10b981" strokeDasharray="3 3" label={{ value: 'Support', fill: '#10b981', fontSize: 10, position: 'right' }} />
+                                            <Line type="monotone" dataKey="close" stroke="#3b82f6" strokeWidth={2} dot={false} />
+                                        </LineChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            </div>
+
+                            <div className="bg-slate-900/50 border border-slate-800 rounded-2xl p-6">
+                                <h3 className="text-lg font-semibold mb-4">Key Levels</h3>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <div className="text-sm text-slate-400 mb-2">Support Zones</div>
+                                        {data.levels.support.map((level, i) => (
+                                            <div key={i} className="flex items-center gap-2 text-emerald-400">
+                                                <TrendingDown className="w-4 h-4" />
+                                                <span className="font-mono">{Number(level).toFixed(5)}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <div>
+                                        <div className="text-sm text-slate-400 mb-2">Resistance Zones</div>
+                                        {data.levels.resistance.map((level, i) => (
+                                            <div key={i} className="flex items-center gap-2 text-rose-400">
+                                                <TrendingUp className="w-4 h-4" />
+                                                <span className="font-mono">{Number(level).toFixed(5)}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <footer className="mt-8 pt-6 border-t border-slate-800 text-center text-xs text-slate-500">
+                        <p>Forex Trading Plan • Conservative Day Trading Strategy • D1/H4/H1 Analysis</p>
+                        <p className="mt-1">Risk Warning: Trading involves substantial risk of loss.</p>
+                    </footer>
+                </div>
+            );
+        };
+
+        ReactDOM.createRoot(document.getElementById('root')).render(<ForexTradingPlan />);
+    </script>
+</body>
+</html>
