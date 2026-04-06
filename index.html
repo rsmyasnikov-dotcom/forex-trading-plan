@@ -3,645 +3,360 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FX Scanner Pro v7.1 | Безопасный Анализ</title>
+    <title>FX Scanner v8</title>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <script src="https://unpkg.com/lightweight-charts@4.1.0/dist/lightweight-charts.standalone.production.js"></script>
     <style>
-        *{box-sizing:border-box;margin:0;padding:0}
-        body{background:#0a0c10;color:#e8eaed;font-family:'Inter',system-ui,sans-serif;overflow-x:hidden}
-        ::-webkit-scrollbar{width:6px;height:6px}
-        ::-webkit-scrollbar-track{background:rgba(255,255,255,0.03)}
-        ::-webkit-scrollbar-thumb{background:rgba(100,130,200,0.4);border-radius:3px}
+        *{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif}
+        body{background:#0d1117;color:#c9d1d9;line-height:1.5}
+        .card{background:#161b22;border:1px solid #30363d;border-radius:12px;padding:16px}
+        .btn{background:#238636;color:#fff;border:none;border-radius:6px;padding:12px 24px;font-size:14px;font-weight:600;cursor:pointer;width:100%}
+        .btn:hover{background:#2ea043}
+        .btn:disabled{background:#30363d;color:#8b949e;cursor:not-allowed}
+        .text-green{color:#3fb950}
+        .text-red{color:#f85149}
+        .text-yellow{color:#d29922}
+        .text-gray{color:#8b949e}
+        .flex{display:flex;gap:12px;align-items:center}
+        .grid{display:grid;gap:12px}
+        .loading{animation:pulse 1.5s infinite}
         @keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
-        @keyframes rotate{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
-        @keyframes slideIn{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
-        .glass{background:rgba(20,24,35,0.8);backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,0.06)}
-        .gradient-text{background:linear-gradient(135deg,#00d4aa,#00a8e8);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
-        .killzone-pulse{animation:pulse 2s infinite}
-        .error-fallback{padding:40px;text-align:center;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);border-radius:16px;margin:20px}
-        .chart-container{position:relative;height:400px;width:100%;border-radius:12px;overflow:hidden}
     </style>
 </head>
 <body>
     <div id="root"></div>
     <script type="text/babel">
-        const {useState,useEffect,useRef,useCallback,useMemo}=React;
-        const {createChart,ColorType}=window.LightweightCharts;
+        const {useState,useEffect,useCallback}=React;
         
-        // ═══════════════════════════════════════════════════════════════════════════════
-        // ERROR BOUNDARY - Защита от падений [^44^][^45^]
-        // ═══════════════════════════════════════════════════════════════════════════════
+        // Безопасные утилиты
+        const fmt=(n,d=5)=>typeof n==='number'&&!isNaN(n)?n.toFixed(d):'--';
+        const num=n=>typeof n==='number'&&!isNaN(n)?n:0;
         
-        class ErrorBoundary extends React.Component {
-            constructor(props) {
-                super(props);
-                this.state = { hasError: false, error: null };
+        // Данные
+        const PAIRS=[
+            {p:'EUR/USD',t:'major',w:-0.85},
+            {p:'GBP/USD',t:'major',w:-0.9},
+            {p:'USD/JPY',t:'major',w:0.88},
+            {p:'AUD/USD',t:'commodity',w:-0.75},
+            {p:'USD/CAD',t:'commodity',w:0.8},
+            {p:'NZD/USD',t:'commodity',w:-0.7},
+            {p:'USD/CHF',t:'major',w:0.82},
+            {p:'GBP/JPY',t:'cross',w:0.05},
+            {p:'XAU/USD',t:'metal',w:-0.6}
+        ];
+        
+        const KZ=[
+            {n:'Токио',s:2,e:5,c:'#58a6ff'},
+            {n:'Лондон',s:10,e:14,c:'#3fb950'},
+            {n:'Нью-Йорк',s:16,e:22,c:'#d29922'}
+        ];
+        
+        // API
+        async function getData(pair){
+            try{
+                const[b,q]=pair.split('/');
+                const r=await fetch(`https://api.exchangerate-api.com/v4/latest/${b}`);
+                const d=await r.json();
+                const price=num(d?.rates?.[q]);
+                if(!price)throw new Error('no data');
+                
+                // Генерируем свечи
+                const candles=[];
+                let p=price;
+                for(let i=100;i>0;i--){
+                    const ch=(Math.random()-0.5)*0.002;
+                    const o=p;
+                    p=p*(1+ch);
+                    candles.push({
+                        t:Date.now()/1000-i*3600,
+                        o:o,
+                        h:Math.max(o,p)*1.001,
+                        l:Math.min(o,p)*0.999,
+                        c:p
+                    });
+                }
+                return{price,candles,dxy:103.5,src:'API'};
+            }catch(e){
+                const fallback={EUR:1.085,GBP:1.275,JPY:151.8,AUD:0.658,CAD:1.358,NZD:0.598,CHF:0.905,XAU:2034.5};
+                const price=fallback[pair.split('/')[0]]||1;
+                const candles=[];
+                let p=price;
+                for(let i=100;i>0;i--){
+                    const ch=(Math.random()-0.5)*0.002;
+                    const o=p;
+                    p=p*(1+ch);
+                    candles.push({t:Date.now()/1000-i*3600,o,h:Math.max(o,p)*1.001,l:Math.min(o,p)*0.999,c:p});
+                }
+                return{price,candles,dxy:103.5,src:'demo'};
             }
+        }
+        
+        // Компоненты
+        function App(){
+            const[pair,setPair]=useState(PAIRS[0]);
+            const[loading,setLoading]=useState(false);
+            const[data,setData]=useState(null);
+            const[analysis,setAnalysis]=useState(null);
+            const[time,setTime]=useState('');
+            const[hour,setHour]=useState(12);
             
-            static getDerivedStateFromError(error) {
-                return { hasError: true, error };
-            }
+            useEffect(()=>{
+                const t=setInterval(()=>{
+                    const now=new Date();
+                    setTime(now.toLocaleTimeString('ru-RU',{timeZone:'Europe/Moscow'}));
+                    setHour(parseInt(now.toLocaleTimeString('ru-RU',{hour:'2-digit',timeZone:'Europe/Moscow'})));
+                },1000);
+                return()=>clearInterval(t);
+            },[]);
             
-            componentDidCatch(error, errorInfo) {
-                console.error('Ошибка в компоненте:', error, errorInfo);
-            }
+            const scan=useCallback(async()=>{
+                setLoading(true);
+                try{
+                    const d=await getData(pair.p);
+                    setData(d);
+                    
+                    // Анализ
+                    const c=d.candles;
+                    const cur=d.price;
+                    const isJ=pair.p.includes('JPY');
+                    const dig=isJ?3:5;
+                    
+                    const highs=c.slice(-20).map(x=>num(x.h));
+                    const lows=c.slice(-20).map(x=>num(x.l));
+                    const max20=Math.max(...highs);
+                    const min20=Math.min(...lows);
+                    const range=max20-min20||0.001;
+                    const mid=(max20+min20)/2;
+                    const pos=(cur-min20)/range;
+                    
+                    const zone=pos>0.8?'premium':pos<0.2?'discount':'equilibrium';
+                    const atr=c.slice(-14).reduce((a,x,i,arr)=>{
+                        if(i===0)return a;
+                        const tr=Math.max(num(x.h)-num(x.l),Math.abs(num(x.h)-num(arr[i-1].c)),Math.abs(num(x.l)-num(arr[i-1].c)));
+                        return a+tr;
+                    },0)/14;
+                    
+                    // Сетапы
+                    const buy=zone==='discount'||zone==='equilibrium'?{
+                        entry:`${fmt(min20,dig)} - ${fmt(min20+atr*0.3,dig)}`,
+                        sl:fmt(min20-atr*1.5,dig),
+                        tp1:fmt(cur+atr*2.5,dig),
+                        tp2:fmt(cur+atr*4,dig),
+                        rr:'1:2.5',
+                        why:`Дискаунт зона (${(pos*100).toFixed(0)}%). Отскок к середине.`
+                    }:null;
+                    
+                    const sell=zone==='premium'||zone==='equilibrium'?{
+                        entry:`${fmt(max20-atr*0.3,dig)} - ${fmt(max20,dig)}`,
+                        sl:fmt(max20+atr*1.5,dig),
+                        tp1:fmt(cur-atr*2.5,dig),
+                        tp2:fmt(cur-atr*4,dig),
+                        rr:'1:2.5',
+                        why:`Премиум зона (${(pos*100).toFixed(0)}%). Отскок к середине.`
+                    }:null;
+                    
+                    setAnalysis({
+                        zone,pos,max20,min20,mid,atr:fmt(atr,isJ?2:4),
+                        buy,sell,
+                        priority:zone==='discount'?'buy':zone==='premium'?'sell':null
+                    });
+                }finally{
+                    setLoading(false);
+                }
+            },[pair]);
             
-            render() {
-                if (this.state.hasError) {
-                    return (
-                        <div className="error-fallback">
-                            <div style={{fontSize:48,marginBottom:16}}>⚠️</div>
-                            <div style={{fontSize:18,color:"#ef4444",fontWeight:700,marginBottom:8}}>Произошла ошибка</div>
-                            <div style={{fontSize:13,color:"#9ca3af",marginBottom:16}}>{this.state.error?.message}</div>
-                            <button 
-                                onClick={() => window.location.reload()}
-                                style={{padding:"12px 24px",background:"#22cc88",border:"none",borderRadius:8,color:"#fff",fontWeight:700,cursor:"pointer"}}
-                            >
-                                Перезагрузить страницу
-                            </button>
+            const activeKZ=KZ.find(k=>hour>=k.s&&hour<k.e);
+            
+            return(
+                <div style={{maxWidth:800,margin:'0 auto',padding:16}}>
+                    {/* Шапка */}
+                    <div className="flex" style={{justifyContent:'space-between',marginBottom:24}}>
+                        <div>
+                            <h1 style={{fontSize:24,margin:0}}>FX Scanner <span className="text-green">v8</span></h1>
+                            <div className="text-gray" style={{fontSize:12}}>ICT · Smart Money</div>
                         </div>
-                    );
-                }
-                return this.props.children;
-            }
-        }
-        
-        // ═══════════════════════════════════════════════════════════════════════════════
-        // БЕЗОПАСНЫЕ УТИЛИТЫ (с проверками)
-        // ═══════════════════════════════════════════════════════════════════════════════
-        
-        const безопасныйToFixed = (значение, знаки = 5) => {
-            if (значение === undefined || значение === null || isNaN(значение)) return "--";
-            try {
-                return Number(значение).toFixed(знаки);
-            } catch (e) {
-                return "--";
-            }
-        };
-        
-        const безопасноеЧисло = (значение, дефолт = 0) => {
-            if (значение === undefined || значение === null || isNaN(значение)) return дефолт;
-            return Number(значение);
-        };
-        
-        const получитьВремяМосква = () => {
-            try {
-                return new Date().toLocaleTimeString("ru-RU", {
-                    hour: "2-digit", 
-                    minute: "2-digit", 
-                    second: "2-digit", 
-                    timeZone: "Europe/Moscow"
-                });
-            } catch (e) {
-                return "--:--:--";
-            }
-        };
-        
-        const получитьЧасМосква = () => {
-            try {
-                return parseInt(new Date().toLocaleTimeString("ru-RU", {
-                    hour: "2-digit", 
-                    timeZone: "Europe/Moscow"
-                }));
-            } catch (e) {
-                return 12;
-            }
-        };
-        
-        // ═══════════════════════════════════════════════════════════════════════════════
-        // КОНФИГУРАЦИЯ
-        // ═══════════════════════════════════════════════════════════════════════════════
-        
-        const ВАЛЮТНЫЕ_ПАРЫ = [
-            {пара:"EUR/USD",тип:"мажор",dxyВес:-0.85,сессии:["Лондон","Нью-Йорк"]},
-            {пара:"GBP/USD",тип:"мажор",dxyВес:-0.9,сессии:["Лондон","Нью-Йорк"]},
-            {пара:"USD/JPY",тип:"мажор",dxyВес:0.88,сессии:["Токио","Лондон","Нью-Йорк"]},
-            {пара:"AUD/USD",тип:"товарная",dxyВес:-0.75,сессии:["Сидней","Лондон","Нью-Йорк"]},
-            {пара:"USD/CAD",тип:"товарная",dxyВес:0.8,сессии:["Торонто","Лондон","Нью-Йорк"]},
-            {пара:"NZD/USD",тип:"товарная",dxyВес:-0.7,сессии:["Веллингтон","Лондон","Нью-Йорк"]},
-            {пара:"USD/CHF",тип:"мажор",dxyВес:0.82,сессии:["Лондон","Нью-Йорк"]},
-            {пара:"GBP/JPY",тип:"кросс",dxyВес:0.05,сессии:["Лондон","Нью-Йорк"]},
-            {пара:"EUR/GBP",тип:"кросс",dxyВес:-0.15,сессии:["Лондон"]},
-            {пара:"XAU/USD",тип:"металл",dxyВес:-0.6,сессии:["Лондон","Нью-Йорк"]}
-        ];
-        
-        const КИЛЛ_ЗОНЫ = [
-            {название:"Токио",начало:2,конец:5,цвет:"#3b82f6",иконка:"🌏"},
-            {название:"Лондон",начало:10,конец:14,цвет:"#10b981",иконка:"🏰",премиум:true},
-            {название:"Нью-Йорк",начало:16,конец:22,цвет:"#f59e0b",иконка:"🗽",премиум:true}
-        ];
-        
-        // ═══════════════════════════════════════════════════════════════════════════════
-        // ГЕНЕРАЦИЯ ДАННЫХ (безопасная)
-        // ═══════════════════════════════════════════════════════════════════════════════
-        
-        function генерацияСвечей(базоваяЦена, количество = 100) {
-            if (!базоваяЦена || isNaN(базоваяЦена)) базоваяЦена = 1.0;
-            const свечи = [];
-            let цена = базоваяЦена;
-            
-            for (let i = 0; i < количество; i++) {
-                const время = Math.floor(Date.now() / 1000) - (количество - i) * 3600;
-                const изменение = (Math.random() - 0.5) * 0.002 * цена;
-                const открытие = цена;
-                цена += изменение;
-                const закрытие = цена;
-                const максимум = Math.max(открытие, закрытие) * (1 + Math.random() * 0.001);
-                const минимум = Math.min(открытие, закрытие) * (1 - Math.random() * 0.001);
-                
-                свечи.push({
-                    time: время,
-                    open: открытие,
-                    high: максимум,
-                    low: минимум,
-                    close: закрытие,
-                    volume: Math.floor(Math.random() * 1000 + 100)
-                });
-            }
-            return свечи;
-        }
-        
-        // ═══════════════════════════════════════════════════════════════════════════════
-        // API (с обработкой ошибок)
-        // ═══════════════════════════════════════════════════════════════════════════════
-        
-        async function загрузитьДанные(пара) {
-            try {
-                const [база, котировка] = пара.split('/');
-                const url = `https://api.exchangerate-api.com/v4/latest/${база}`;
-                
-                const ответ = await fetch(url, { cache: 'no-cache' });
-                if (!ответ.ok) throw new Error('API недоступен');
-                
-                const данные = await ответ.json();
-                const цена = данные?.rates?.[котировка];
-                
-                if (!цена || isNaN(цена)) throw new Error('Некорректная цена');
-                
-                return {
-                    цена: Number(цена),
-                    свечи: генерацияСвечей(Number(цена), 100),
-                    dxy: 103.5,
-                    источник: 'API',
-                    время: new Date().toISOString()
-                };
-            } catch (e) {
-                // Fallback
-                const демоЦены = {
-                    "EUR/USD": 1.0850, "GBP/USD": 1.2750, "USD/JPY": 151.80,
-                    "AUD/USD": 0.6580, "USD/CAD": 1.3580, "NZD/USD": 0.5980,
-                    "USD/CHF": 0.9050, "GBP/JPY": 193.50, "EUR/GBP": 0.8520,
-                    "XAU/USD": 2034.50
-                };
-                const цена = демоЦены[пара] || 1.0;
-                return {
-                    цена: цена,
-                    свечи: генерацияСвечей(цена, 100),
-                    dxy: 103.5,
-                    источник: 'демо',
-                    время: new Date().toISOString(),
-                    демо: true
-                };
-            }
-        }
-        
-        // ═══════════════════════════════════════════════════════════════════════════════
-        // АНАЛИЗ (с проверками)
-        // ═══════════════════════════════════════════════════════════════════════════════
-        
-        function выполнитьАнализ(данные, пара) {
-            if (!данные || !данные.свечи || данные.свечи.length === 0) {
-                return null;
-            }
-            
-            const свечи = данные.свечи;
-            const текущаяЦена = безопасноеЧисло(данные.цена, 1.0);
-            const isJPY = пара.includes("JPY");
-            const знаки = isJPY ? 3 : 5;
-            
-            // Безопасный расчёт уровней
-            const ценыЗакрытия = свечи.map(с => безопасноеЧисло(с.close, 0));
-            const макс20 = Math.max(...ценыЗакрытия.slice(-20).filter(c => c > 0)) || текущаяЦена * 1.01;
-            const мин20 = Math.min(...ценыЗакрытия.slice(-20).filter(c => c > 0)) || текущаяЦена * 0.99;
-            const диапазон = макс20 - мин20 || текущаяЦена * 0.02;
-            const середина = (макс20 + мин20) / 2;
-            
-            // Premium/Discount
-            const позиция = (текущаяЦена - мин20) / диапазон;
-            const зона = позиция > 0.8 ? "премиум" : позиция < 0.2 ? "дискаунт" : "равновесие";
-            
-            // ATR (безопасно)
-            const atr = свечи.slice(-14).reduce((acc, с, i, arr) => {
-                if (i === 0) return acc;
-                const предыдущая = arr[i-1];
-                const tr = Math.max(
-                    безопасноеЧисло(с.high, 0) - безопасноеЧисло(с.low, 0),
-                    Math.abs(безопасноеЧисло(с.high, 0) - безопасноеЧисло(предыдущая.close, 0)),
-                    Math.abs(безопасноеЧисло(с.low, 0) - безопасноеЧисло(предыдущая.close, 0))
-                );
-                return acc + tr;
-            }, 0) / 14 || текущаяЦена * 0.001;
-            
-            // Сетапы
-            const сетапПокупка = (зона === "дискаунт" || зона === "равновесие") ? {
-                валиден: true,
-                зонаВхода: `${безопасныйToFixed(мин20, знаки)} - ${безопасныйToFixed(мин20 + atr * 0.3, знаки)}`,
-                стопЛосс: безопасныйToFixed(мин20 - atr * 1.5, знаки),
-                тп1: безопасныйToFixed(текущаяЦена + atr * 2.5, знаки),
-                тп2: безопасныйToFixed(текущаяЦена + atr * 4, знаки),
-                рр1: "2.5",
-                рр2: "4.0",
-                логика: `Цена в зоне ${зона === "дискаунт" ? "дискаунта" : "равновесия"} (${(позиция * 100).toFixed(0)}%). Ожидается отскок.`,
-                концепция: "ICT Premium/Discount",
-                atr: безопасныйToFixed(atr, isJPY ? 2 : 4)
-            } : null;
-            
-            const сетапПродажа = (зона === "премиум" || зона === "равновесие") ? {
-                валиден: true,
-                зонаВхода: `${безопасныйToFixed(макс20 - atr * 0.3, знаки)} - ${безопасныйToFixed(макс20, знаки)}`,
-                стопЛосс: безопасныйToFixed(макс20 + atr * 1.5, знаки),
-                тп1: безопасныйToFixed(текущаяЦена - atr * 2.5, знаки),
-                тп2: безопасныйToFixed(текущаяЦена - atr * 4, знаки),
-                рр1: "2.5",
-                рр2: "4.0",
-                логика: `Цена в зоне ${зона === "премиум" ? "премиума" : "равновесия"} (${(позиция * 100).toFixed(0)}%). Ожидается отскок.`,
-                концепция: "ICT Premium/Discount",
-                atr: безопасныйToFixed(atr, isJPY ? 2 : 4)
-            } : null;
-            
-            return {
-                текущаяЦена,
-                зона,
-                позиция,
-                макс20,
-                мин20,
-                середина,
-                atr,
-                сетапПокупка,
-                сетапПродажа,
-                приоритет: зона === "дискаунт" ? "покупка" : зона === "премиум" ? "продажа" : null
-            };
-        }
-        
-        // ═══════════════════════════════════════════════════════════════════════════════
-        // КОМПОНЕНТЫ
-        // ═══════════════════════════════════════════════════════════════════════════════
-        
-        function График({свечи, уровни}) {
-            const refГрафика = useRef(null);
-            const chartRef = useRef(null);
-            
-            useEffect(() => {
-                if (!refГрафика.current || !свечи || свечи.length === 0) return;
-                
-                try {
-                    // Очистка предыдущего графика
-                    if (chartRef.current) {
-                        chartRef.current.remove();
-                        chartRef.current = null;
-                    }
+                        <div style={{textAlign:'right'}}>
+                            <div style={{fontSize:20,fontWeight:600}}>{time}</div>
+                            <div className="text-gray" style={{fontSize:11}}>Москва</div>
+                        </div>
+                    </div>
                     
-                    const chart = createChart(refГрафика.current, {
-                        layout: {
-                            background: { type: ColorType.Solid, color: "transparent" },
-                            textColor: "#9ca3af"
-                        },
-                        grid: {
-                            vertLines: { color: "rgba(255,255,255,0.03)" },
-                            horzLines: { color: "rgba(255,255,255,0.03)" }
-                        },
-                        crosshair: { mode: 1 },
-                        rightPriceScale: { borderColor: "rgba(255,255,255,0.1)" },
-                        timeScale: { borderColor: "rgba(255,255,255,0.1)" },
-                        height: 400
-                    });
+                    {/* Сессии */}
+                    <div className="grid" style={{gridTemplateColumns:'repeat(3,1fr)',marginBottom:24}}>
+                        {KZ.map(k=>{
+                            const active=hour>=k.s&&hour<k.e;
+                            return(
+                                <div key={k.n} className="card" style={{
+                                    borderColor:active?k.c:'#30363d',
+                                    background:active?`${k.c}10`:'#161b22'
+                                }}>
+                                    <div style={{fontSize:12,color:active?k.c:'#8b949e',fontWeight:600}}>{k.n}</div>
+                                    <div className="text-gray" style={{fontSize:11}}>{k.s}:00-{k.e}:00</div>
+                                    {active&&<div style={{width:6,height:6,borderRadius:'50%',background:k.c,marginTop:8}} className="loading"/>}
+                                </div>
+                            );
+                        })}
+                    </div>
                     
-                    chartRef.current = chart;
+                    {/* Пары */}
+                    <div className="grid" style={{gridTemplateColumns:'repeat(3,1fr)',marginBottom:24}}>
+                        {PAIRS.map(p=>{
+                            const sel=p.p===pair.p;
+                            return(
+                                <div key={p.p} className="card" onClick={()=>{setPair(p);setData(null);setAnalysis(null);}} style={{
+                                    cursor:'pointer',
+                                    borderColor:sel?'#238636':'#30363d',
+                                    background:sel?'#23863620':'#161b22'
+                                }}>
+                                    <div style={{fontSize:14,fontWeight:600,color:sel?'#3fb950':'#c9d1d9'}}>{p.p}</div>
+                                    <div className="text-gray" style={{fontSize:11}}>{p.t}</div>
+                                </div>
+                            );
+                        })}
+                    </div>
                     
-                    const series = chart.addCandlestickSeries({
-                        upColor: "#10b981", downColor: "#ef4444",
-                        borderUpColor: "#10b981", borderDownColor: "#ef4444",
-                        wickUpColor: "#10b981", wickDownColor: "#ef4444"
-                    });
-                    
-                    // Безопасная установка данных
-                    const валидныеСвечи = свечи.filter(с => 
-                        с && typeof с.time === 'number' && 
-                        typeof с.open === 'number' && 
-                        typeof с.high === 'number' && 
-                        typeof с.low === 'number' && 
-                        typeof с.close === 'number'
-                    );
-                    
-                    if (валидныеСвечи.length > 0) {
-                        series.setData(валидныеСвечи);
-                    }
-                    
-                    // Уровни (безопасно)
-                    if (уровни && Array.isArray(уровни)) {
-                        уровни.forEach(ур => {
-                            if (!ур || typeof ур.цена !== 'number') return;
-                            const line = chart.addLineSeries({
-                                color: ур.цвет || "#9ca3af",
-                                lineWidth: 2,
-                                lastValueVisible: false
-                            });
-                            const данныеЛинии = валидныеСвечи.map(с => ({
-                                time: с.time,
-                                value: ур.цена
-                            }));
-                            line.setData(данныеЛинии);
-                        });
-                    }
-                    
-                    chart.timeScale().fitContent();
-                    
-                } catch (e) {
-                    console.error('Ошибка графика:', e);
-                }
-                
-                return () => {
-                    if (chartRef.current) {
-                        try {
-                            chartRef.current.remove();
-                        } catch (e) {
-                            console.error('Ошибка очистки графика:', e);
-                        }
-                        chartRef.current = null;
-                    }
-                };
-            }, [свечи, уровни]);
-            
-            return <div ref={refГрафика} className="glass" style={{borderRadius:12,padding:12,height:400}}/>;
-        }
-        
-        function КарточкаСетапа({сетап, тип, приоритет}) {
-            if (!сетап || !сетап.валиден) return null;
-            
-            const цвет = тип === "покупка" ? "#10b981" : "#ef4444";
-            const isBuy = тип === "покупка";
-            
-            return (
-                <div className="glass" style={{
-                    padding: 24,
-                    borderRadius: 16,
-                    border: `2px solid ${приоритет ? цвет : "rgba(255,255,255,0.1)"}`,
-                    background: приоритет ? `${цвет}10` : "transparent"
-                }}>
-                    {приоритет && (
-                        <div style={{marginBottom: 12, padding: "4px 12px", background: цвет, borderRadius: 6, display: "inline-block", fontSize: 11, fontWeight: 700, color: "#fff"}}>
-                            ★ РЕКОМЕНДУЕТСЯ
+                    {/* Результат */}
+                    {data&&analysis&&!loading&&(
+                        <div style={{marginBottom:100}}>
+                            {/* Цена */}
+                            <div className="card" style={{marginBottom:16,textAlign:'center'}}>
+                                <div style={{fontSize:48,fontWeight:700}}>{fmt(data.price,pair.p.includes('JPY')?3:5)}</div>
+                                <div className="text-gray" style={{fontSize:12}}>
+                                    {pair.p} · {data.src} · 
+                                    <span style={{color:analysis.zone==='premium'?'#f85149':analysis.zone==='discount'?'#3fb950':'#d29922',marginLeft:8,textTransform:'uppercase'}}>
+                                        {analysis.zone}
+                                    </span>
+                                </div>
+                            </div>
+                            
+                            {/* Уровни */}
+                            <div className="card" style={{marginBottom:16}}>
+                                <div style={{fontSize:12,color:'#8b949e',marginBottom:12}}>КЛЮЧЕВЫЕ УРОВНИ</div>
+                                <div className="grid" style={{gridTemplateColumns:'repeat(3,1fr)'}}>
+                                    <div style={{textAlign:'center'}}>
+                                        <div className="text-red" style={{fontSize:18,fontWeight:600}}>{fmt(analysis.max20)}</div>
+                                        <div className="text-gray" style={{fontSize:10}}>Сопротивление</div>
+                                    </div>
+                                    <div style={{textAlign:'center'}}>
+                                        <div style={{fontSize:18,fontWeight:600,color:'#d29922'}}>{fmt(analysis.mid)}</div>
+                                        <div className="text-gray" style={{fontSize:10}}>Середина</div>
+                                    </div>
+                                    <div style={{textAlign:'center'}}>
+                                        <div className="text-green" style={{fontSize:18,fontWeight:600}}>{fmt(analysis.min20)}</div>
+                                        <div className="text-gray" style={{fontSize:10}}>Поддержка</div>
+                                    </div>
+                                </div>
+                                <div style={{marginTop:12,height:4,background:'#30363d',borderRadius:2,position:'relative'}}>
+                                    <div style={{
+                                        position:'absolute',
+                                        left:`${analysis.pos*100}%`,
+                                        top:0,bottom:0,
+                                        width:4,
+                                        background:'#d29922',
+                                        borderRadius:2,
+                                        transform:'translateX(-50%)'
+                                    }}/>
+                                </div>
+                                <div className="flex" style={{justifyContent:'space-between',marginTop:8,fontSize:10}}>
+                                    <span className="text-gray">0%</span>
+                                    <span className="text-gray">Позиция в диапазоне: {(analysis.pos*100).toFixed(0)}%</span>
+                                    <span className="text-gray">100%</span>
+                                </div>
+                            </div>
+                            
+                            {/* Сетапы */}
+                            <div className="grid" style={{gridTemplateColumns:'1fr 1fr',gap:16}}>
+                                {analysis.buy&&(
+                                    <div className="card" style={{
+                                        borderColor:analysis.priority==='buy'?'#3fb950':'#30363d',
+                                        background:analysis.priority==='buy'?'#3fb95010':'#161b22'
+                                    }}>
+                                        <div className="flex" style={{marginBottom:12}}>
+                                            <span style={{fontSize:24}}>🚀</span>
+                                            <div>
+                                                <div className="text-green" style={{fontSize:16,fontWeight:700}}>LONG</div>
+                                                {analysis.priority==='buy'&&<div style={{fontSize:10,color:'#3fb950'}}>★ РЕКОМЕНДУЕТСЯ</div>}
+                                            </div>
+                                        </div>
+                                        <div style={{fontSize:12,marginBottom:8}}>
+                                            <span className="text-gray">Вход: </span>
+                                            <span style={{color:'#d29922',fontWeight:600}}>{analysis.buy.entry}</span>
+                                        </div>
+                                        <div style={{fontSize:12,marginBottom:8}}>
+                                            <span className="text-gray">SL: </span>
+                                            <span className="text-red">{analysis.buy.sl}</span>
+                                        </div>
+                                        <div style={{fontSize:12,marginBottom:8}}>
+                                            <span className="text-gray">TP: </span>
+                                            <span className="text-green">{analysis.buy.tp1} / {analysis.buy.tp2}</span>
+                                        </div>
+                                        <div className="text-gray" style={{fontSize:11,marginTop:12,paddingTop:12,borderTop:'1px solid #30363d'}}>
+                                            {analysis.buy.why}
+                                        </div>
+                                    </div>
+                                )}
+                                
+                                {analysis.sell&&(
+                                    <div className="card" style={{
+                                        borderColor:analysis.priority==='sell'?'#f85149':'#30363d',
+                                        background:analysis.priority==='sell'?'#f8514910':'#161b22'
+                                    }}>
+                                        <div className="flex" style={{marginBottom:12}}>
+                                            <span style={{fontSize:24}}>🔻</span>
+                                            <div>
+                                                <div className="text-red" style={{fontSize:16,fontWeight:700}}>SHORT</div>
+                                                {analysis.priority==='sell'&&<div style={{fontSize:10,color:'#f85149'}}>★ РЕКОМЕНДУЕТСЯ</div>}
+                                            </div>
+                                        </div>
+                                        <div style={{fontSize:12,marginBottom:8}}>
+                                            <span className="text-gray">Вход: </span>
+                                            <span style={{color:'#d29922',fontWeight:600}}>{analysis.sell.entry}</span>
+                                        </div>
+                                        <div style={{fontSize:12,marginBottom:8}}>
+                                            <span className="text-gray">SL: </span>
+                                            <span className="text-red">{analysis.sell.sl}</span>
+                                        </div>
+                                        <div style={{fontSize:12,marginBottom:8}}>
+                                            <span className="text-gray">TP: </span>
+                                            <span className="text-green">{analysis.sell.tp1} / {analysis.sell.tp2}</span>
+                                        </div>
+                                        <div className="text-gray" style={{fontSize:11,marginTop:12,paddingTop:12,borderTop:'1px solid #30363d'}}>
+                                            {analysis.sell.why}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                            
+                            {!analysis.buy&&!analysis.sell&&(
+                                <div className="card" style={{textAlign:'center',padding:40}}>
+                                    <div style={{fontSize:32,marginBottom:8}}>⚠️</div>
+                                    <div style={{fontSize:16,color:'#d29922'}}>Нет сетапа</div>
+                                    <div className="text-gray" style={{fontSize:12,marginTop:8}}>Цена вне зон входа</div>
+                                </div>
+                            )}
                         </div>
                     )}
                     
-                    <div style={{display: "flex", alignItems: "center", gap: 12, marginBottom: 20}}>
-                        <div style={{fontSize: 32}}>{isBuy ? "🚀" : "🔻"}</div>
-                        <div>
-                            <div style={{fontSize: 20, fontWeight: 800, color: цвет}}>
-                                {isBuy ? "LONG" : "SHORT"} SETUP
-                            </div>
-                            <div style={{fontSize: 12, color: "#6b7280"}}>{сетап.концепция}</div>
+                    {/* Пусто */}
+                    {!data&&!loading&&(
+                        <div style={{textAlign:'center',padding:60}}>
+                            <div className="text-gray" style={{fontSize:14}}>Выберите пару и нажмите СКАНИРОВАТЬ</div>
                         </div>
-                    </div>
+                    )}
                     
-                    <div style={{display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16}}>
-                        <div className="glass" style={{padding: 12, borderRadius: 8}}>
-                            <div style={{fontSize: 10, color: "#6b7280", marginBottom: 4}}>ЗОНА ВХОДА</div>
-                            <div style={{fontSize: 16, fontWeight: 700, color: "#f59e0b"}}>{сетап.зонаВхода}</div>
+                    {/* Загрузка */}
+                    {loading&&(
+                        <div style={{textAlign:'center',padding:60}}>
+                            <div className="loading text-green" style={{fontSize:16}}>Анализ...</div>
                         </div>
-                        <div className="glass" style={{padding: 12, borderRadius: 8}}>
-                            <div style={{fontSize: 10, color: "#6b7280", marginBottom: 4}}>STOP LOSS</div>
-                            <div style={{fontSize: 16, fontWeight: 700, color: "#ef4444"}}>{сетап.стопЛосс}</div>
-                        </div>
-                        <div className="glass" style={{padding: 12, borderRadius: 8}}>
-                            <div style={{fontSize: 10, color: "#6b7280", marginBottom: 4}}>TP1 (R:R {сетап.рр1})</div>
-                            <div style={{fontSize: 16, fontWeight: 700, color: "#10b981"}}>{сетап.тп1}</div>
-                        </div>
-                        <div className="glass" style={{padding: 12, borderRadius: 8}}>
-                            <div style={{fontSize: 10, color: "#6b7280", marginBottom: 4}}>TP2 (R:R {сетап.рр2})</div>
-                            <div style={{fontSize: 16, fontWeight: 700, color: "#10b981"}}>{сетап.тп2}</div>
-                        </div>
-                    </div>
-                    
-                    <div className="glass" style={{padding: 12, borderRadius: 8}}>
-                        <div style={{fontSize: 11, color: "#6b7280", marginBottom: 4}}>ЛОГИКА</div>
-                        <div style={{fontSize: 13, color: "#e5e7eb", lineHeight: 1.6}}>{сетап.логика}</div>
-                    </div>
-                </div>
-            );
-        }
-        
-        // ═══════════════════════════════════════════════════════════════════════════════
-        // ГЛАВНЫЙ КОМПОНЕНТ
-        // ═══════════════════════════════════════════════════════════════════════════════
-        
-        function Приложение() {
-            const [выбраннаяПара, setВыбраннаяПара] = useState(ВАЛЮТНЫЕ_ПАРЫ[0]);
-            const [загрузка, setЗагрузка] = useState(false);
-            const [данные, setДанные] = useState(null);
-            const [анализ, setАнализ] = useState(null);
-            const [время, setВремя] = useState(получитьВремяМосква());
-            const [час, setЧас] = useState(получитьЧасМосква());
-            const [ошибка, setОшибка] = useState(null);
-            
-            useEffect(() => {
-                const таймер = setInterval(() => {
-                    setВремя(получитьВремяМосква());
-                    setЧас(получитьЧасМосква());
-                }, 1000);
-                return () => clearInterval(таймер);
-            }, []);
-            
-            const выполнитьСкан = useCallback(async () => {
-                setЗагрузка(true);
-                setОшибка(null);
-                
-                try {
-                    const данныеПары = await загрузитьДанные(выбраннаяПара.пара);
-                    setДанные(данныеПары);
-                    
-                    const результатАнализа = выполнитьАнализ(данныеПары, выбраннаяПара.пара);
-                    setАнализ(результатАнализа);
-                } catch (e) {
-                    console.error('Ошибка сканирования:', e);
-                    setОшибка(e.message);
-                } finally {
-                    setЗагрузка(false);
-                }
-            }, [выбраннаяПара]);
-            
-            const активнаяСессия = КИЛЛ_ЗОНЫ.find(с => час >= с.начало && час < с.конец) || null;
-            
-            return (
-                <div style={{minHeight: "100vh", background: "linear-gradient(180deg,#0a0c10,#111827)"}}>
-                    {/* Шапка */}
-                    <div className="glass" style={{position: "sticky", top: 0, zIndex: 100, padding: "20px 24px"}}>
-                        <div style={{maxWidth: "1400px", margin: "0 auto", display: "flex", justifyContent: "space-between", alignItems: "center"}}>
-                            <div>
-                                <div style={{fontSize: 24, fontWeight: 800}}>
-                                    <span className="gradient-text">FX SCANNER PRO</span>
-                                    <span style={{marginLeft: 12, fontSize: 12, color: "#00d4aa", border: "1px solid rgba(0,212,170,0.4)", borderRadius: 6, padding: "2px 8px"}}>v7.1</span>
-                                </div>
-                                <div style={{fontSize: 11, color: "#6b7280", marginTop: 4}}>ICT · SMC · БЕЗОПАСНЫЙ АНАЛИЗ</div>
-                            </div>
-                            <div style={{textAlign: "right"}}>
-                                <div style={{fontSize: 24, fontWeight: 700, color: "#fff", fontFamily: "monospace"}}>{время}</div>
-                                <div style={{fontSize: 11, color: "#6b7280"}}>Москва (UTC+3)</div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div style={{maxWidth: "1400px", margin: "0 auto", padding: "24px"}}>
-                        {/* Сессии */}
-                        <div style={{display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12, marginBottom: 24}}>
-                            {КИЛЛ_ЗОНЫ.map(сессия => {
-                                const активна = час >= сессия.начало && час < сессия.конец;
-                                return (
-                                    <div key={сессия.название} className="glass" style={{
-                                        padding: 16,
-                                        borderRadius: 12,
-                                        border: `1px solid ${активна ? сессия.цвет : "transparent"}`,
-                                        background: активна ? `${сессия.цвет}15` : undefined
-                                    }}>
-                                        <div style={{display: "flex", alignItems: "center", gap: 8, marginBottom: 8}}>
-                                            <span style={{fontSize: 24}}>{сессия.иконка}</span>
-                                            {активна && <div className="killzone-pulse" style={{width: 8, height: 8, borderRadius: "50%", background: сессия.цвет}}/>}
-                                        </div>
-                                        <div style={{fontSize: 16, fontWeight: 700, color: активна ? сессия.цвет : "#9ca3af"}}>{сессия.название}</div>
-                                        <div style={{fontSize: 12, color: "#6b7280"}}>{сессия.начало}:00 - {сессия.конец}:00 МСК</div>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                        
-                        {/* Выбор пары */}
-                        <div style={{marginBottom: 24}}>
-                            <div style={{fontSize: 12, color: "#6b7280", marginBottom: 12}}>ВЫБЕРИТЕ ВАЛЮТНУЮ ПАРУ</div>
-                            <div style={{display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 10}}>
-                                {ВАЛЮТНЫЕ_ПАРЫ.map(п => {
-                                    const выбрана = п.пара === выбраннаяПара.пара;
-                                    return (
-                                        <div 
-                                            key={п.пара} 
-                                            onClick={() => { setВыбраннаяПара(п); setДанные(null); setАнализ(null); }}
-                                            className="glass"
-                                            style={{
-                                                padding: 14,
-                                                borderRadius: 12,
-                                                cursor: "pointer",
-                                                border: `1px solid ${выбрана ? "#00d4aa" : "transparent"}`,
-                                                background: выбрана ? "rgba(0,212,170,0.1)" : undefined
-                                            }}
-                                        >
-                                            <div style={{fontSize: 14, fontWeight: 700, color: выбрана ? "#00d4aa" : "#e5e7eb"}}>{п.пара}</div>
-                                            <div style={{fontSize: 11, color: "#6b7280", marginTop: 4}}>{п.тип}</div>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        </div>
-                        
-                        {/* Ошибка */}
-                        {ошибка && (
-                            <div className="error-fallback">
-                                <div style={{fontSize: 18, color: "#ef4444", fontWeight: 700, marginBottom: 8}}>Ошибка: {ошибка}</div>
-                                <button onClick={выполнитьСкан} style={{padding: "10px 20px", background: "#22cc88", border: "none", borderRadius: 8, color: "#fff", fontWeight: 700, cursor: "pointer"}}>
-                                    Попробовать снова
-                                </button>
-                            </div>
-                        )}
-                        
-                        {/* Загрузка */}
-                        {загрузка && (
-                            <div style={{textAlign: "center", padding: 60}}>
-                                <div style={{width: 60, height: 60, margin: "0 auto 20px", border: "4px solid rgba(0,212,170,0.1)", borderTopColor: "#00d4aa", borderRadius: "50%", animation: "rotate 1s linear infinite"}}/>
-                                <div style={{fontSize: 16, color: "#00d4aa"}}>Анализ рынка...</div>
-                            </div>
-                        )}
-                        
-                        {/* Результаты */}
-                        {данные && анализ && !загрузка && (
-                            <div style={{animation: "slideIn 0.5s ease"}}>
-                                {/* Цена */}
-                                <div className="glass" style={{padding: 24, borderRadius: 16, marginBottom: 24, display: "flex", justifyContent: "space-between", alignItems: "center"}}>
-                                    <div>
-                                        <div style={{fontSize: 42, fontWeight: 800, color: "#fff"}}>
-                                            {безопасныйToFixed(данные.цена, выбраннаяПара.пара.includes("JPY") ? 3 : 5)}
-                                        </div>
-                                        <div style={{fontSize: 13, color: "#6b7280", marginTop: 4}}>
-                                            {выбраннаяПара.пара} · {данные.источник} {данные.демо && "(демо)"}
-                                        </div>
-                                    </div>
-                                    <div style={{textAlign: "right"}}>
-                                        <div style={{padding: "8px 16px", background: "rgba(16,185,129,0.1)", borderRadius: 8, color: "#10b981", fontWeight: 700}}>
-                                            ✓ Данные актуальны
-                                        </div>
-                                        <div style={{fontSize: 12, color: "#6b7280", marginTop: 8}}>
-                                            Зона: <span style={{color: анализ.зона === "премиум" ? "#ef4444" : анализ.зона === "дискаунт" ? "#10b981" : "#f59e0b", fontWeight: 700}}>{анализ.зона.toUpperCase()}</span>
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                {/* График */}
-                                <div style={{marginBottom: 24}}>
-                                    <График 
-                                        свечи={данные.свечи} 
-                                        уровни={[
-                                            {цена: анализ.макс20, цвет: "#ef4444"},
-                                            {цена: анализ.середина, цвет: "#9ca3af"},
-                                            {цена: анализ.мин20, цвет: "#10b981"}
-                                        ]} 
-                                    />
-                                </div>
-                                
-                                {/* Сетапы */}
-                                <div style={{display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16}}>
-                                    <КарточкаСетапа 
-                                        сетап={анализ.сетапПокупка} 
-                                        тип="покупка" 
-                                        приоритет={анализ.приоритет === "покупка"} 
-                                    />
-                                    <КарточкаСетапа 
-                                        сетап={анализ.сетапПродажа} 
-                                        тип="продажа" 
-                                        приоритет={анализ.приоритет === "продажа"} 
-                                    />
-                                </div>
-                            </div>
-                        )}
-                        
-                        {/* Пустое состояние */}
-                        {!данные && !загрузка && !ошибка && (
-                            <div style={{textAlign: "center", padding: 80}}>
-                                <div style={{fontSize: 64, opacity: 0.2, marginBottom: 20}}>◈</div>
-                                <div style={{fontSize: 18, color: "#6b7280", marginBottom: 8}}>Готов к анализу</div>
-                                <div style={{fontSize: 14, color: "#4b5563"}}>Выберите пару и нажмите кнопку ниже</div>
-                            </div>
-                        )}
-                    </div>
+                    )}
                     
                     {/* Кнопка */}
-                    <div style={{position: "fixed", bottom: 0, left: 0, right: 0, background: "rgba(10,12,16,0.95)", backdropFilter: "blur(20px)", borderTop: "1px solid rgba(255,255,255,0.08)", padding: "20px 24px 28px"}}>
-                        <div style={{maxWidth: "1400px", margin: "0 auto"}}>
-                            <button 
-                                onClick={выполнитьСкан}
-                                disabled={загрузка}
-                                style={{
-                                    width: "100%",
-                                    height: 64,
-                                    background: загрузка ? "rgba(0,212,170,0.1)" : "linear-gradient(135deg,#00d4aa,#00a8e8)",
-                                    border: "none",
-                                    borderRadius: 12,
-                                    color: загрузка ? "rgba(0,212,170,0.4)" : "#fff",
-                                    fontSize: 18,
-                                    fontWeight: 800,
-                                    cursor: загрузка ? "not-allowed" : "pointer",
-                                    boxShadow: загрузка ? "none" : "0 8px 32px rgba(0,212,170,0.3)"
-                                }}
-                            >
-                                {загрузка ? "АНАЛИЗ..." : "🔬 ЗАПУСТИТЬ АНАЛИЗ"}
+                    <div style={{position:'fixed',bottom:0,left:0,right:0,background:'#0d1117',borderTop:'1px solid #30363d',padding:16}}>
+                        <div style={{maxWidth:800,margin:'0 auto'}}>
+                            <button className="btn" onClick={scan} disabled={loading} style={{height:48}}>
+                                {loading?'АНАЛИЗ...':'СКАНИРОВАТЬ'}
                             </button>
                         </div>
                     </div>
@@ -649,12 +364,7 @@
             );
         }
         
-        // Рендер с Error Boundary
-        ReactDOM.createRoot(document.getElementById('root')).render(
-            <ErrorBoundary>
-                <Приложение/>
-            </ErrorBoundary>
-        );
+        ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
     </script>
 </body>
 </html>
