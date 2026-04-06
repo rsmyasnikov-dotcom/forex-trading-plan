@@ -2,38 +2,89 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>FX Scanner Pro AI</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>FX AI Scanner</title>
   
-  <!-- Загружаем React и ReactDOM прямо из интернета -->
+  <!-- Загрузка React и ReactDOM -->
   <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
-  <!-- Загружаем Babel, чтобы браузер понимал код React (JSX) -->
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
+  <!-- Красивые современные шрифты -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+
   <style>
-    body {
-      margin: 0;
-      padding: 0;
-      background-color: #060c14;
-      color: #ccdde8;
-      font-family: system-ui, -apple-system, sans-serif;
+    :root {
+      --bg-main: #0B1120;
+      --bg-card: #111827;
+      --bg-hover: #1F2937;
+      --border-color: #1E293B;
+      --text-main: #F8FAFC;
+      --text-muted: #94A3B8;
+      --color-buy: #10B981;
+      --color-buy-bg: rgba(16, 185, 129, 0.1);
+      --color-sell: #EF4444;
+      --color-sell-bg: rgba(239, 68, 68, 0.1);
+      --color-warn: #F59E0B;
+      --color-info: #3B82F6;
     }
+    
+    body {
+      margin: 0; padding: 0;
+      background-color: var(--bg-main);
+      color: var(--text-main);
+      font-family: 'Inter', sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    
     * { box-sizing: border-box; }
     ::-webkit-scrollbar { display: none; }
     
-    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
-    @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
-    @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: .45; } }
+    button {
+      font-family: 'Inter', sans-serif;
+      cursor: pointer;
+      outline: none;
+      transition: all 0.2s ease;
+    }
+    button:active { transform: scale(0.98); }
+    button:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+
+    .mono { font-family: 'JetBrains Mono', monospace; }
+
+    /* Анимации */
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .5; } }
+    @keyframes progress-slide { 0% { background-position: 0% 50%; } 100% { background-position: 100% 50%; } }
     
-    input, button { outline: none; }
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      padding: 16px;
+      margin-bottom: 16px;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    }
+
+    .progress-bar-container {
+      width: 100%;
+      height: 8px;
+      background: var(--border-color);
+      border-radius: 4px;
+      overflow: hidden;
+      margin-top: 12px;
+    }
+    
+    .progress-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--color-info), var(--color-buy), var(--color-info));
+      background-size: 200% 100%;
+      animation: progress-slide 2s linear infinite;
+      transition: width 0.3s ease;
+    }
   </style>
 </head>
 <body>
-  <!-- Контейнер, куда React нарисует интерфейс -->
   <div id="root"></div>
 
-  <!-- Весь код приложения -->
   <script type="text/babel">
     const { useState, useEffect, useRef } = React;
 
@@ -41,21 +92,23 @@
 
     // =====================================================================
     // 🔴 ВСТАВЬТЕ ВАШ API КЛЮЧ GEMINI СЮДА 🔴
-    // =====================================================================
-    const GEMINI_API_KEY = "AIzaSyBExY6ytjAobZO2fr3cIA2K9565Oatk5Y0";
+    const GEMINI_API_KEY = "ТВОЙ_API_КЛЮЧ_GEMINI";
     // =====================================================================
 
-    // ─── Получение текущих цен (с обходом блокировок CORS через allorigins) ───
+    // --- Функции парсинга и расчетов ---
+    function getMoscowTime() { 
+      return new Date().toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Moscow" }); 
+    }
+
     async function fetchLivePrices(pairs) {
       function toYahoo(p) { return p.replace("/", "") + "=X"; }
       try {
         const symbols = pairs.map(toYahoo).join(",");
         const url = `https://api.allorigins.win/get?url=${encodeURIComponent(`https://query1.finance.yahoo.com/v7/finance/quote?symbols=${symbols}&fields=regularMarketPrice,symbol`)}`;
         const response = await fetch(url);
-        if (!response.ok) throw new Error('Network error');
+        if (!response.ok) throw new Error('Ошибка сети');
         const data = await response.json();
         const yahooData = JSON.parse(data.contents);
-
         const out = {};
         for (const q of yahooData?.quoteResponse?.result ||[]) {
           const p = pairs.find(x => toYahoo(x) === q.symbol);
@@ -63,596 +116,387 @@
             out[p] = parseFloat(q.regularMarketPrice > 10 ? q.regularMarketPrice.toFixed(3) : q.regularMarketPrice.toFixed(5));
           }
         }
-        if (!Object.keys(out).length) throw new Error("empty");
+        if (!Object.keys(out).length) throw new Error("Пустые данные");
         return out;
       } catch (err) {
-        console.error("Ошибка при получении цен:", err);
+        console.error("Ошибка котировок:", err);
         return {};
       }
     }
 
-    // ─── Поиск в интернете через Gemini (Web Research) ───
-    async function fetchWebResearch(pair) {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 30000);
-      try {
-        const prompt = `Search the web RIGHT NOW for: 1) the exact current live price of ${pair} from a forex source, 2) today's key support and resistance levels for ${pair} from a technical analysis site, 3) any major news or sentiment affecting ${pair} today. Return ONLY this JSON object (no other text): {"price":number,"price_source":"site name","support_levels":[{"price":number,"desc":"string"}],"resistance_levels":[{"price":number,"desc":"string"}],"sentiment":"bullish|bearish|neutral","news_summary":"brief summary in Russian","sources":["url1","url2"]}`;
-
-        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
-          signal: controller.signal, method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ contents: [{ parts:[{ text: prompt }] }], tools: [{ googleSearch: {} }], generationConfig: { maxOutputTokens: 1000, responseMimeType: "application/json" } })
-        });
-
-        const txt = await res.text();
-        if (!res.ok) throw new Error(`HTTP ${res.status}: ${txt.slice(0, 100)}`);
-        const data = JSON.parse(txt);
-        if (data.error) throw new Error(data.error.message);
-        const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
-        console.log("ОТВЕТ ВЕБ-ПОИСКА:", text);
-        return JSON.parse(text);
-      } catch (e) {
-        if (e.name === "AbortError") throw new Error("Таймаут веб-поиска.");
-        throw e;
-      } finally { clearTimeout(timer); }
-    }
-
-    // ─── Парсеры JSON ───
     function extractJSON(text) {
       let cleaned = text.replace(/```json\s*/gi, "").replace(/```\s*/g, "").trim();
-      try { return JSON.parse(cleaned); } catch (e) { throw new Error("Не удалось разобрать ответ AI. Текст был: " + text); }
-    }
-
-    function extractJSONArray(text) {
-      let cleaned = text.replace(/```json\s*/gi, "").replace(/```\s*/g, "").trim();
-      try { const r = JSON.parse(cleaned); if (Array.isArray(r)) return r; } catch (_) { }
-      const s = cleaned.indexOf("["), e = cleaned.lastIndexOf("]");
-      if (s !== -1 && e > s) try { const r = JSON.parse(cleaned.slice(s, e + 1)); if (Array.isArray(r)) return r; } catch (_) { }
-      throw new Error("Не удалось разобрать массив пар.");
+      const start = cleaned.indexOf("{");
+      const end = cleaned.lastIndexOf("}");
+      if (start !== -1 && end !== -1) {
+        cleaned = cleaned.slice(start, end + 1);
+      }
+      try { return JSON.parse(cleaned); } catch(e) { throw new Error("Сбой формата ИИ"); }
     }
 
     function enforceRR(s, isBuy) {
-      const entry = Number(s.entry_num), sl = Number(s.sl_num);
+      if (!s) return null;
+      let entry = Number(s.entry_num) || 0;
+      let sl = Number(s.sl_num) || 0;
       if (!entry || !sl) return s;
-      const risk = Math.abs(entry - sl), dir = isBuy ? 1 : -1;
-      const fix = (v, m) => isBuy ? Math.max(v, m) : Math.min(v, m);
-      s.tp1_num = fix(Number(s.tp1_num), entry + dir * risk * 2.2);
-      s.tp1 = Number(s.tp1_num).toFixed(4);
-      s.tp2_num = fix(Number(s.tp2_num), entry + dir * risk * 3.2);
-      s.tp2 = Number(s.tp2_num).toFixed(4);
+      const risk = Math.abs(entry - sl);
+      const dir = isBuy ? 1 : -1;
+      s.tp1_num = entry + dir * risk * 2.2;
+      s.tp1 = s.tp1_num.toFixed(4);
+      s.tp2_num = entry + dir * risk * 3.2;
+      s.tp2 = s.tp2_num.toFixed(4);
       return s;
     }
 
-    function getMoscowTime() { return new Date().toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit", second: "2-digit", timeZone: "Europe/Moscow" }); }
-    function getSession() {
-      const h = parseInt(new Date().toLocaleTimeString("ru-RU", { hour: "2-digit", timeZone: "Europe/Moscow" }));
-      if (h >= 10 && h < 19) return { name: "ЛОНДОН", color: "#22cc88" };
-      if (h >= 16 && h < 24) return { name: "НЬЮ-ЙОРК", color: "#e8c94a" };
-      if (h >= 3 && h < 12) return { name: "АЗИЯ", color: "#7fb3e0" };
-      return { name: "ОФМАРКЕТ", color: "#8899bb" };
-    }
-    function vibe(p = [80, 40, 80]) { try { navigator.vibrate && navigator.vibrate(p); } catch (_) { } }
-
-    // ─── Офлайн Режим ───
+    // --- Офлайн-заглушка на случай блокировки VPN ---
     function offlineAnalysis(pair, price, isDeep) {
-      if (!price || isNaN(price)) price = 1.0;
-      const p = parseFloat(price);
+      const p = parseFloat(price) || (pair.includes("JPY") ? 150.00 : 1.1000);
       const isJPY = pair.includes("JPY");
       const fmt = v => v.toFixed(isJPY ? 3 : 4);
-      const atrMap = { "EUR/USD": 0.0008, "GBP/USD": 0.0011, "USD/JPY": 0.08, "AUD/USD": 0.0007, "USD/CAD": 0.0008, "NZD/USD": 0.0006, "USD/CHF": 0.0007, "GBP/JPY": 0.13 };
-      const atr = atrMap[pair] || 0.0008;
+      const atr = isJPY ? 0.15 : 0.0015;
       const roundStep = isJPY ? 0.5 : 0.005;
       const nearRes = Math.ceil(p / roundStep) * roundStep;
       const nearSup = Math.floor(p / roundStep) * roundStep;
-      const bias = nearRes - p < p - nearSup ? "sell" : "buy";
+      const bias = (nearRes - p < p - nearSup) ? "sell" : "buy";
+      
+      const sl = bias === "buy" ? nearSup - atr : nearRes + atr;
+      const entry = bias === "buy" ? nearSup + (atr*0.2) : nearRes - (atr*0.2);
+
       return {
-        mode: isDeep ? "deep" : "quick", context: `${pair}: ${fmt(p)} — технический анализ (офлайн-режим)`, _offline: true,
-        signal: bias, confidence: 65, entry_num: bias === "buy" ? nearSup : nearRes, sl_num: bias === "buy" ? nearSup - atr : nearRes + atr,
-        tp1_num: bias === "buy" ? nearRes : nearSup, news_risk: "medium", reason: "AI offline mode"
+        mode: isDeep ? "deep" : "quick",
+        context: `СЕРВЕР НЕДОСТУПЕН. Показан математический расчет от уровней для ${pair} по цене ${fmt(p)}.`,
+        signal: bias,
+        confidence: 60,
+        _offline: true,
+        entry_num: entry,
+        entry_zone: fmt(entry),
+        sl_num: sl,
+        sl: fmt(sl),
+        tp1_num: bias === "buy" ? entry + atr*2.2 : entry - atr*2.2,
+        news_risk: "medium",
+        buy: bias === "buy" ? enforceRR({ entry_num: entry, sl_num: sl, confidence: 60, pattern: "Отскок от поддержки" }, true) : null,
+        sell: bias === "sell" ? enforceRR({ entry_num: entry, sl_num: sl, confidence: 60, pattern: "Отбой от сопротивления" }, false) : null,
+        market_regime: { type: "range", description: "Математический расчет без ИИ", score: 50 },
+        sr_levels:[
+          { type: "resistance", price: fmt(nearRes), price_num: nearRes, description: "Сопротивление" },
+          { type: "support", price: fmt(nearSup), price_num: nearSup, description: "Поддержка" }
+        ]
       };
     }
-    function offlineMultiAnalysis(pairs, prices) {
-      return pairs.map(pair => {
-        const price = prices[pair] || null;
-        const r = offlineAnalysis(pair, price, false);
-        return { pair, signal: r.signal, confidence: r.confidence, entry_num: r.entry_num, entry_zone: r.entry_zone, sl_num: r.sl_num, tp1_num: r.tp1_num, context: r.context, regime: r.regime, news_risk: r.news_risk, _offline: true };
-      });
+
+    // --- Промпт для ИИ ---
+    function buildPrompt(pair, dateStr, livePrice) {
+      return `Отвечай СТРОГО в формате JSON. Никакого лишнего текста.
+Пара: ${pair}. Текущая цена: ${livePrice || 'неизвестно'}. Дата: ${dateStr}.
+Ты - профессиональный трейдер. Проведи глубокий технический анализ.
+
+Сгенерируй JSON строго по этому шаблону:
+{
+  "mode": "deep",
+  "context": "Краткое описание ситуации на рынке на русском языке.",
+  "signal": "buy или sell или no_trade",
+  "confidence": 85,
+  "market_regime": { "type": "trend или range", "description": "описание" },
+  "sr_levels":[
+    {"type": "resistance", "price": "1.1050", "price_num": 1.1050, "description": "описание"},
+    {"type": "support", "price": "1.0950", "price_num": 1.0950, "description": "описание"}
+  ],
+  "buy": { "entry_num": 1.0960, "sl_num": 1.0930, "pattern": "пинбар/OB", "reasoning": "почему покупаем" },
+  "sell": { "entry_num": 1.1040, "sl_num": 1.1070, "pattern": "поглощение/OB", "reasoning": "почему продаем" },
+  "no_trade": null,
+  "news_risk": "low или medium или high"
+}`;
     }
 
-    // ─── Оценка решения ───
-    function evaluateTradeDecision(result, session) {
-      if (!result) return null;
-      const confidence = result.confidence?.score || result.confidence || 0;
-      const noTrade = result.no_trade;
-      const newsRisk = result.news?.events?.length ? (result.news.events.some(e => e.impact === "high") ? "high" : result.news.events.some(e => e.impact === "medium") ? "medium" : "low") : (result.news_risk || "medium");
-      const mtfSignal = result.mtf?.signal || null;
-      const mtfAligned = result.mtf?.aligned || 0;
-
-      if (noTrade?.reason) {
-        return { verdict: "no_trade", score: 10, message: noTrade.reason, wait_for: noTrade.wait_for, factors:[{ name: "AI решение", good: false, detail: "Нет качественного сетапа" }] };
-      }
-
-      let score = 0;
-      const factors =[];
-
-      const confScore = Math.round((Math.min(100, confidence) / 100) * 35);
-      score += confScore;
-      factors.push({ name: "Уверенность AI", score: confScore, max: 35, good: confidence >= 62, detail: `${confidence}%`, icon: confidence >= 75 ? "✅" : confidence >= 55 ? "⚠️" : "❌" });
-
-      const sessScore = session.name === "ЛОНДОН" || session.name === "НЬЮ-ЙОРК" ? 25 : session.name === "АЗИЯ" ? 12 : 4;
-      score += sessScore;
-      factors.push({ name: "Сессия", score: sessScore, max: 25, good: sessScore >= 20, detail: session.name, icon: sessScore >= 20 ? "✅" : sessScore >= 10 ? "⚠️" : "❌" });
-
-      const newsScore = newsRisk === "low" ? 20 : newsRisk === "medium" ? 7 : 0;
-      score += newsScore;
-      factors.push({ name: "Новостной риск", score: newsScore, max: 20, good: newsRisk === "low", detail: newsRisk === "low" ? "Низкий 🟢" : newsRisk === "medium" ? "Средний 🟡" : "Высокий 🔴", icon: newsRisk === "low" ? "✅" : newsRisk === "medium" ? "⚠️" : "❌" });
-
-      let mtfScore = Math.round((mtfAligned / 4) * 20);
-      if (mtfSignal === "strong_buy" || mtfSignal === "strong_sell") mtfScore = 20;
-      else if (mtfSignal === "conflict") mtfScore = Math.min(mtfScore, 4);
-      score += mtfScore;
-      factors.push({ name: "Мульти-ТФ", score: mtfScore, max: 20, good: mtfScore >= 12, detail: mtfAligned ? `${mtfAligned}/4 согласовано` : "Нет данных", icon: mtfScore >= 14 ? "✅" : mtfScore >= 8 ? "⚠️" : "❌" });
-
-      const totalScore = Math.round(score);
-      let verdict, message, color, bgColor, borderColor;
-
-      if (totalScore >= 68) {
-        verdict = "trade_now"; message = "Условия благоприятны — можно искать вход"; color = "#22dd88"; bgColor = "rgba(34,204,136,.1)"; borderColor = "rgba(34,204,136,.35)";
-      } else if (totalScore >= 48) {
-        verdict = "wait"; message = "Есть риски — подождите подтверждения"; color = "#f0d060"; bgColor = "rgba(240,208,96,.08)"; borderColor = "rgba(240,208,96,.3)";
-      } else {
-        verdict = "no_trade"; message = "Условия неблагоприятны — пропустите этот сигнал"; color = "#ff6677"; bgColor = "rgba(255,68,85,.09)"; borderColor = "rgba(255,68,85,.3)";
-      }
-      return { verdict, score: totalScore, message, factors, color, bgColor, borderColor, newsRisk, sessionName: session.name };
-    }
-
-    // ─── Промпты ───
-    function buildDeepPrompt(pair, dateStr, timeStr, livePrice = null) {
-      const priceNote = livePrice ? `CURRENT LIVE PRICE: ${pair} = ${livePrice}. Use this exact price.` : `Search current ${pair} price.`;
-      return `Respond ONLY with a raw JSON object. No markdown, no text outside JSON. First char={, last char=}.
-${priceNote} Date: ${dateStr}, ${timeStr} MSK. Pair: ${pair}.
-Return ONLY this JSON (Russian text):
-{"mode":"deep","context":"Цена ${pair}: X.XXXX — ситуация","market_regime":{"type":"trend","subtype":"bullish_trend","description":"описание","score":72,"dxy_bias":"DXY бычий/медвежий"},"confidence":{"score":72,"breakdown":{"MTF":80,"Структура":75,"OB/FVG":70,"Новости":60,"DXY":65}},"sr_levels":[{"type":"resistance","price":"X","price_num":0,"strength":4,"description":"описание"},{"type":"support","price":"X","price_num":0,"strength":5,"description":"описание"}],"ob_fvg":{"bullish_ob":[{"high":0,"low":0,"strength":3,"description":"OB"}],"bearish_ob":[],"fvg_up":[],"fvg_down":[]},"buy":{"entry_zone":"X-Y","entry_num":0,"stop_loss":"X","sl_num":0,"sl_reasoning":"стоп","tp1":"X","tp1_num":0,"tp2":"X","tp2_num":0,"confidence":70,"pattern":"паттерн","reasoning":"обоснование"},"sell":{"entry_zone":"X-Y","entry_num":0,"stop_loss":"X","sl_num":0,"sl_reasoning":"стоп","tp1":"X","tp1_num":0,"tp2":"X","tp2_num":0,"confidence":50,"pattern":"паттерн","reasoning":"обоснование"},"mtf":{"h1":{"trend":"bull","structure":"HH/HL","ema":"выше"},"h4":{"trend":"bull","structure":"пробой","ema":"выше"},"daily":{"trend":"bear","structure":"нисходящий","ema":"ниже"},"weekly":{"trend":"bull","structure":"коррекция","ema":"выше"},"signal":"weak_buy","aligned":3,"signal_text":"3/4 ТФ бычьи"},"news":{"summary":"фон","safe_window":"HH:MM-HH:MM МСК","events":[{"time_msk":"15:30","name":"NFP","impact":"high","description":"данные"}]},"tips":{"best_session":"Лондон","confirmation":"свеча от OB","avoid":"до новостей","checklist":["зона","ТФ","новостей нет","подтверждение"],"max_trades":"Макс 2 сделки"},"no_trade":null}
-If no valid setup: buy=null, sell=null, no_trade={"reason":"причина","wait_for":"что ждать","retry_time":"время"}`;
-    }
-
-    function buildQuickPrompt(pair, dateStr, timeStr, livePrice = null) {
-      const priceNote = livePrice ? `CURRENT LIVE PRICE: ${pair} = ${livePrice}.` : `Use best knowledge for ${pair} price.`;
-      return `Respond ONLY with raw JSON. No markdown, no text outside JSON.
-${priceNote} Date: ${dateStr}, ${timeStr} MSK. Pair: ${pair}.
-Quick scan. Return JSON (Russian text):
-{"mode":"quick","context":"Цена ${pair}: X.XXXX — ситуация","signal":"buy|sell|no_trade","confidence":0-100,"entry_num":number,"entry_zone":"string","sl_num":number,"sl":"string","tp1_num":number,"tp1":"string","tp2_num":number,"tp2":"string","regime":"trend|range|pullback|expansion","reason":"обоснование","news_risk":"low|medium|high","no_trade_reason":null}`;
-    }
-
-    function buildMultiPrompt(pairs, dateStr, timeStr, prices = {}) {
-      const priceList = pairs.map(p => `${p}=${prices[p] || "?"}`).join(", ");
-      return `Respond ONLY with a raw JSON array. No markdown, no text outside JSON.
-CURRENT LIVE PRICES: ${priceList}. Date: ${dateStr}, ${timeStr} MSK.
-Return JSON array for ALL pairs:[{"pair":"EUR/USD","signal":"buy|sell|no_trade","confidence":0-100,"entry_num":number,"entry_zone":"string|null","sl_num":number|null,"tp1_num":number|null,"context":"Цена: X — ситуация","regime":"string","news_risk":"low|medium|high"}]`;
-    }
-
-    // ─── Компоненты UI ───────────────────────────────────────────────────
-
-    function OBFVGChart({ obfvg, buy, sell }) {
-      const levels =[];
-      if (buy) { levels.push(buy.sl_num, buy.entry_num, buy.tp1_num, buy.tp2_num); }
-      if (sell) { levels.push(sell.sl_num, sell.entry_num, sell.tp1_num, sell.tp2_num); }
-      obfvg?.bullish_ob?.forEach(o => { levels.push(o.high, o.low); });
-      obfvg?.bearish_ob?.forEach(o => { levels.push(o.high, o.low); });
-      obfvg?.fvg_up?.forEach(f => { levels.push(f.high, f.low); });
-      obfvg?.fvg_down?.forEach(f => { levels.push(f.high, f.low); });
-      const valid = levels.filter(v => v && !isNaN(Number(v)) && Number(v) > 0).map(Number);
-      if (valid.length < 2) return null;
-      const mn = Math.min(...valid), mx = Math.max(...valid);
-      const pad = (mx - mn) * 0.08;
-      const minP = mn - pad, maxP = mx + pad, range = maxP - minP || 0.001;
-      const W = 300, H = 180;
-      const toY = v => H - ((Number(v) - minP) / range) * H;
-      const isBuyPrimary = !sell || (buy && sell && (buy.confidence || 0) >= (sell.confidence || 0));
-      const primary = isBuyPrimary ? buy : sell;
-      const pColor = isBuyPrimary ? "#22cc88" : "#ff5566";
-      return (
-        <div style={{ background: "rgba(10,16,26,.95)", border: "1px solid rgba(100,160,220,.18)", borderRadius: 12, padding: "12px 14px", marginBottom: 12 }}>
-          <div style={{ fontFamily: "'Courier New',monospace", fontSize: 10, color: "#aabbdd", letterSpacing: "2px", marginBottom: 10, fontWeight: 700 }}>КАРТА ЗОН · OB / FVG / УРОВНИ</div>
-          <div style={{ overflowX: "auto" }}>
-            <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ overflow: "visible", display: "block", minWidth: 260 }}>
-              {[0, .25, .5, .75, 1].map(t => (<line key={t} x1={32} y1={H * t} x2={W} y2={H * t} stroke="rgba(255,255,255,.05)" strokeWidth="0.5" />))}
-              {obfvg?.bullish_ob?.map((ob, i) => { const y1 = toY(ob.high), y2 = toY(ob.low), h = Math.max(3, y2 - y1); return <g key={`bob${i}`}><rect x={32} y={y1} width={W - 32} height={h} fill="rgba(34,204,136,.16)" stroke="rgba(34,204,136,.6)" strokeWidth="1" strokeDasharray="4,2" /><text x={34} y={y1 - 2} fill="rgba(68,220,150,.9)" fontSize="7.5" fontFamily="Courier New,monospace" fontWeight="bold">OB↑</text></g>; })}
-              {obfvg?.bearish_ob?.map((ob, i) => { const y1 = toY(ob.high), y2 = toY(ob.low), h = Math.max(3, y2 - y1); return <g key={`seob${i}`}><rect x={32} y={y1} width={W - 32} height={h} fill="rgba(255,68,85,.16)" stroke="rgba(255,68,85,.6)" strokeWidth="1" strokeDasharray="4,2" /><text x={34} y={y1 - 2} fill="rgba(255,100,120,.9)" fontSize="7.5" fontFamily="Courier New,monospace" fontWeight="bold">OB↓</text></g>; })}
-              {obfvg?.fvg_up?.map((fvg, i) => { const y1 = toY(fvg.high), y2 = toY(fvg.low), h = Math.max(2, y2 - y1); return <rect key={`fvgu${i}`} x={32} y={y1} width={W - 32} height={h} fill="rgba(34,204,136,.1)" stroke="rgba(34,204,136,.32)" strokeWidth="0.8" />; })}
-              {obfvg?.fvg_down?.map((fvg, i) => { const y1 = toY(fvg.high), y2 = toY(fvg.low), h = Math.max(2, y2 - y1); return <rect key={`fvgd${i}`} x={32} y={y1} width={W - 32} height={h} fill="rgba(255,68,85,.1)" stroke="rgba(255,68,85,.32)" strokeWidth="0.8" />; })}
-              {primary &&[{ v: primary.sl_num, c: "#ff6677", l: "SL", d: "4,3" }, { v: primary.entry_num, c: "#f0d060", l: "ENTRY", d: "none" }, { v: primary.tp1_num, c: "#22dd88", l: "TP1", d: "4,3" }, primary.tp2_num && { v: primary.tp2_num, c: "#55ffcc", l: "TP2", d: "4,3" }].filter(Boolean).map(({ v, c, l, d }) => (<g key={l}><line x1={32} y1={toY(v)} x2={W} y2={toY(v)} stroke={c} strokeWidth={l === "ENTRY" ? 2 : 1.2} strokeDasharray={d} /><text x={30} y={toY(v) + 3.5} textAnchor="end" fill={c} fontSize="8" fontFamily="Courier New,monospace" fontWeight="bold">{l}</text></g>))}
-              {primary?.entry_num && primary?.sl_num && (<rect x={32} y={Math.min(toY(primary.entry_num), toY(primary.sl_num)) - 1} width={W - 32} height={Math.abs(toY(primary.entry_num) - toY(primary.sl_num)) + 2} fill={`${pColor}09`} />)}
-              {[0, .25, .5, .75, 1].map(t => { const price = (maxP - t * range); const digits = price > 10 ? 2 : price > 1 ? 4 : 5; return <text key={t} x={30} y={H * t + 3} textAnchor="end" fill="rgba(180,210,250,.75)" fontSize="7" fontFamily="Courier New,monospace">{price.toFixed(digits)}</text>; })}
-            </svg>
-          </div>
-        </div>
-      );
-    }
-
-    function MarketRegimeCard({ regime }) {
-      if (!regime) return null;
-      const TYPES = { trend: { icon: "📈", c: "#22cc88", l: "ТРЕНД" }, bullish_trend: { icon: "📈", c: "#22cc88", l: "БЫЧИЙ ТРЕНД" }, bearish_trend: { icon: "📉", c: "#ff5566", l: "МЕДВЕЖИЙ ТРЕНД" }, range: { icon: "↔", c: "#7fb3e0", l: "ДИАПАЗОН" } };
-      const r = TYPES[regime.subtype] || TYPES[regime.type] || { icon: "◆", c: "#8899aa", l: (regime.type || "ОБЫЧНЫЙ").toUpperCase() };
-      const score = Math.min(100, Math.max(0, Number(regime.score) || 50));
-      const circ = 2 * Math.PI * 18, off = circ - (score / 100) * circ;
-      return (
-        <div style={{ background: "rgba(12,18,28,.9)", border: `1px solid ${r.c}30`, borderRadius: 12, padding: "12px 14px", marginBottom: 12 }}>
-          <div style={{ fontFamily: "'Courier New',monospace", fontSize: 10, color: "#aabbdd", letterSpacing: "2px", marginBottom: 10, fontWeight: 700 }}>РЕЖИМ РЫНКА</div>
-          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-            <div style={{ position: "relative", width: 46, height: 46, flexShrink: 0 }}>
-              <svg width="46" height="46" viewBox="0 0 46 46" style={{ transform: "rotate(-90deg)" }}>
-                <circle cx="23" cy="23" r="18" fill="none" stroke="rgba(255,255,255,.09)" strokeWidth="3.5" />
-                <circle cx="23" cy="23" r="18" fill="none" stroke={r.c} strokeWidth="3.5" strokeDasharray={circ} strokeDashoffset={off} strokeLinecap="round" />
-              </svg>
-              <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>{r.icon}</div>
-            </div>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontFamily: "'Courier New',monospace", fontSize: 13, fontWeight: 700, color: r.c, marginBottom: 5 }}>{r.l} · {score}</div>
-              <div style={{ fontSize: 11, color: "#ccdde8", lineHeight: 1.5 }}>{regime.description}</div>
-            </div>
-          </div>
-        </div>
-      );
-    }
-
-    function NoTradeCard({ noTrade }) {
-      if (!noTrade) return null;
-      return (
-        <div style={{ background: "rgba(12,18,28,.95)", border: "2px solid rgba(240,208,96,.28)", borderRadius: 14, padding: "20px 16px", marginBottom: 12, textAlign: "center" }}>
-          <div style={{ fontSize: 34, marginBottom: 8 }}>🚫</div>
-          <div style={{ fontFamily: "'Courier New',monospace", fontSize: 15, fontWeight: 700, color: "#f0d060", letterSpacing: 3, marginBottom: 10 }}>NO TRADE</div>
-          <div style={{ fontSize: 12, color: "#ccdde8", lineHeight: 1.6 }}>{noTrade.reason}</div>
-        </div>
-      );
-    }
-
-    function Scale({ sl, entry, tp1, tp2 }) {
-      const nums =[sl, entry, tp1, tp2].filter(Boolean).map(Number);
-      if (nums.length < 2) return null;
-      const mn = Math.min(...nums), mx = Math.max(...nums), range = mx - mn || 0.001;
-      const pos = v => 8 + ((v - mn) / range) * 84;
-      const markers =[{ v: sl, l: "SL", c: "#ff6677", h: 18 }, { v: entry, l: "ENTRY", c: "#f0d060", h: 26 }, { v: tp1, l: "TP1", c: "#22dd88", h: 18 }, tp2 && { v: tp2, l: "TP2", c: "#55ffcc", h: 18 }].filter(Boolean);
-      return (
-        <div style={{ position: "relative", height: 60, margin: "4px 0 10px" }}>
-          <div style={{ position: "absolute", top: "50%", left: "8%", right: "8%", height: 1, background: "rgba(255,255,255,.08)" }} />
-          {markers.map(m => (<div key={m.l} style={{ position: "absolute", left: `${pos(m.v)}%`, top: 0, bottom: 0, transform: "translateX(-50%)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 1 }}><span style={{ fontFamily: "'Courier New',monospace", fontSize: 9, color: m.c, fontWeight: 700 }}>{m.l}</span><div style={{ width: 2, height: m.h, background: m.c, borderRadius: 2 }} /><span style={{ fontFamily: "'Courier New',monospace", fontSize: 8, color: m.c }}>{Number(m.v).toFixed(4)}</span></div>))}
-        </div>
-      );
-    }
-
-    function RRBar({ entry, sl, tp1 }) {
-      const risk = Math.abs(entry - sl), reward = Math.abs(tp1 - entry), total = risk + reward;
-      if (!total) return null;
-      const rPct = (risk / total * 100).toFixed(1), rr = (reward / risk).toFixed(2);
-      return (
-        <div style={{ marginBottom: 12 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", fontFamily: "'Courier New',monospace", fontSize: 10, color: "#ccdde8", marginBottom: 4 }}><span>РИСК {risk.toFixed(4)}</span><span style={{ color: "#f0d060", fontWeight: 700 }}>R:R {rr}</span><span>ПРОФИТ {reward.toFixed(4)}</span></div>
-          <div style={{ height: 5, borderRadius: 3, overflow: "hidden", display: "flex" }}><div style={{ width: `${rPct}%`, background: "linear-gradient(90deg,#cc2233,#ff5566)" }} /><div style={{ width: `${100 - rPct}%`, background: "linear-gradient(90deg,#22aa66,#22dd88)" }} /></div>
-        </div>
-      );
-    }
-
-    function ConfidenceMeter({ score, breakdown }) {
-      if (!score) return null;
-      const pct = Math.min(100, Math.max(0, Number(score)));
-      const c = pct >= 75 ? "#22cc88" : pct >= 55 ? "#f0d060" : "#ff5566";
-      const circ = 2 * Math.PI * 26, off = circ - (pct / 100) * circ;
-      return (
-        <div style={{ background: "rgba(12,18,28,.9)", border: `1px solid ${c}28`, borderRadius: 12, padding: "12px 14px", marginBottom: 12 }}>
-          <div style={{ fontFamily: "'Courier New',monospace", fontSize: 10, color: "#aabbdd", letterSpacing: "2px", marginBottom: 10, fontWeight: 700 }}>УВЕРЕННОСТЬ AI</div>
-          <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-            <div style={{ position: "relative", width: 68, height: 68, flexShrink: 0 }}>
-              <svg width="68" height="68" viewBox="0 0 68 68" style={{ transform: "rotate(-90deg)" }}>
-                <circle cx="34" cy="34" r="26" fill="none" stroke="rgba(255,255,255,.08)" strokeWidth="5" />
-                <circle cx="34" cy="34" r="26" fill="none" stroke={c} strokeWidth="5" strokeDasharray={circ} strokeDashoffset={off} strokeLinecap="round" />
-              </svg>
-              <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}><span style={{ fontFamily: "'Courier New',monospace", fontSize: 17, fontWeight: 700, color: c }}>{pct}%</span></div>
-            </div>
-            <div style={{ flex: 1 }}>
-              {breakdown && Object.entries(breakdown).map(([k, v]) => (<div key={k} style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 5 }}><div style={{ fontFamily: "'Courier New',monospace", fontSize: 10, color: "#aabbdd", width: 80, flexShrink: 0 }}>{k}</div><div style={{ flex: 1, height: 3, borderRadius: 2, background: "rgba(255,255,255,.07)", overflow: "hidden" }}><div style={{ height: "100%", width: `${v}%`, background: `linear-gradient(90deg,${c}88,${c})` }} /></div><div style={{ fontFamily: "'Courier New',monospace", fontSize: 10, color: "#ccdde8", width: 28, textAlign: "right" }}>{v}%</div></div>))}
-            </div>
-          </div>
-        </div>
-      );
-    }
-
-    function SRLevelsCard({ levels, currentPrice }) {
-      if (!levels || !levels.length) return null;
-      const sorted = [...levels].sort((a, b) => Number(b.price_num) - Number(a.price_num));
-      const cp = Number(currentPrice);
-      return (
-        <div style={{ background: "rgba(12,18,28,.9)", border: "1px solid rgba(100,160,220,.18)", borderRadius: 12, padding: "12px 14px", marginBottom: 12 }}>
-          <div style={{ fontFamily: "'Courier New',monospace", fontSize: 10, color: "#aabbdd", letterSpacing: "2px", marginBottom: 10, fontWeight: 700 }}>УРОВНИ PRICE ACTION</div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-            {sorted.map((lvl, i) => {
-              const tc = lvl.type === "resistance" ? "#ff6677" : "#22dd88";
-              const tl = lvl.type === "resistance" ? "СОПР" : "ПОДД";
-              return (<div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 10px", borderRadius: 8, background: "rgba(17,29,42,.7)", border: `1px solid ${tc}1e` }}><div style={{ width: 38, fontFamily: "'Courier New',monospace", fontSize: 10, fontWeight: 700, color: tc }}>{tl}</div><div style={{ fontFamily: "'Courier New',monospace", fontSize: 14, fontWeight: 700, color: cp && Number(lvl.price_num) > cp ? "#ff8899" : "#22dd88", flex: 1 }}>{lvl.price}</div><div style={{ fontSize: 10, color: "#ccdde8", textAlign: "right" }}>{lvl.description}</div></div>);
-            })}
-          </div>
-        </div>
-      );
-    }
-
-    function NewsCard({ news }) {
-      if (!news || !news.events || !news.events.length) return null;
-      return (
-        <div style={{ background: "rgba(14,20,32,.95)", border: "1px solid rgba(232,201,74,.18)", borderRadius: 12, padding: "12px 14px", marginBottom: 12 }}>
-          <div style={{ fontFamily: "'Courier New',monospace", fontSize: 10, color: "#aabbdd", letterSpacing: "2px", marginBottom: 4, fontWeight: 600 }}>КАЛЕНДАРЬ</div>
-          <div style={{ fontSize: 11, color: "#ccdde8", marginBottom: 10 }}>{news.summary}</div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            {news.events.map((ev, i) => (<div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", borderRadius: 8, background: "rgba(255,255,255,.03)", border: `1px solid rgba(255,255,255,0.1)` }}><div style={{ fontFamily: "'Courier New',monospace", fontSize: 10, color: "#7fb3e0" }}>{ev.time_msk}</div><div style={{ flex: 1 }}><div style={{ fontFamily: "'Courier New',monospace", fontSize: 11, color: "#ddeeff", fontWeight: 700 }}>{ev.name}</div></div><div style={{ fontFamily: "'Courier New',monospace", fontSize: 9, color: ev.impact === "high" ? "#ff6677" : "#f0d060" }}>{ev.impact}</div></div>))}
-          </div>
-        </div>
-      );
-    }
-
-    function MTFCard({ mtf }) {
-      if (!mtf) return null;
-      return (
-        <div style={{ background: "rgba(12,18,28,.9)", border: "1px solid rgba(100,160,220,.18)", borderRadius: 12, padding: 14, marginBottom: 12 }}>
-          <div style={{ fontFamily: "'Courier New',monospace", fontSize: 10, color: "#aabbdd", letterSpacing: "2px", marginBottom: 10, fontWeight: 700 }}>МУЛЬТИТАЙМФРЕЙМНЫЙ АНАЛИЗ</div>
-          <div style={{ background: "rgba(34,204,136,.14)", border: `1px solid rgba(34,204,136,.42)`, borderRadius: 10, padding: "10px 14px", display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}><div style={{ flex: 1 }}><div style={{ fontFamily: "'Courier New',monospace", fontSize: 12, fontWeight: 700, color: "#22dd88", marginBottom: 3 }}>СИГНАЛ: {mtf.signal}</div><div style={{ fontSize: 11, color: "#ccdde8" }}>{mtf.signal_text}</div></div></div>
-        </div>
-      );
-    }
-
-    function SetupCard({ data, isBuy, pair }) {
-      if (!data) return null;
-      const accent = isBuy ? "#22dd88" : "#ff6677";
-      return (
-        <div style={{ background: isBuy ? "rgba(6,18,14,.97)" : "rgba(20,6,8,.97)", border: `1.5px solid ${accent}66`, borderRadius: 14, padding: "16px 14px", marginBottom: 12 }}>
-          <div style={{ fontFamily: "'Courier New',monospace", fontSize: 14, fontWeight: 700, letterSpacing: 2, color: accent, marginBottom: 14 }}>{isBuy ? "▲ BUY LIMIT" : "▼ SELL LIMIT"}</div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "11px 14px", marginBottom: 10 }}>
-            {[{ label: "ВХОД", val: data.entry_zone || data.entry_num, color: "#f0d060" }, { label: "SL", val: data.stop_loss || data.sl, color: "#ff7788" }, { label: "TP1", val: data.tp1, color: "#22dd88" }, data.tp2 && { label: "TP2", val: data.tp2, color: "#55ffcc" }].filter(Boolean).map(item => (<div key={item.label}><div style={{ fontFamily: "'Courier New',monospace", fontSize: 9, color: "#bbddee", marginBottom: 3 }}>{item.label}</div><div style={{ fontFamily: "'Courier New',monospace", fontSize: 18, fontWeight: 700, color: item.color }}>{item.val}</div></div>))}
-          </div>
-          <Scale sl={data.sl_num} entry={data.entry_num} tp1={data.tp1_num} tp2={data.tp2_num} />
-          <RRBar entry={data.entry_num} sl={data.sl_num} tp1={data.tp1_num} />
-        </div>
-      );
-    }
-
-    function TipsCard({ tips }) {
-      if (!tips) return null;
-      return (
-        <div style={{ background: "rgba(14,20,32,.95)", border: "1px solid rgba(100,160,220,.14)", borderRadius: 12, padding: 14, marginBottom: 12 }}>
-          <div style={{ fontFamily: "'Courier New',monospace", fontSize: 10, color: "#aabbdd", letterSpacing: "2px", marginBottom: 10, fontWeight: 700 }}>ПРАВИЛА ВХОДА</div>
-          <div style={{ fontSize: 11, color: "#ccdde8" }}>{tips.confirmation}</div>
-        </div>
-      );
-    }
-
-    function QuickSignalCard({ data, onDeepScan }) {
-      if (!data) return null;
-      const sc = data.signal === "buy" ? "#22dd88" : data.signal === "sell" ? "#ff6677" : "#f0d060";
-      return (
-        <div style={{ background: "rgba(10,16,26,.98)", border: `1px solid ${sc}32`, borderRadius: 12, padding: 12 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-            <div style={{ fontFamily: "'Courier New',monospace", fontSize: 13, fontWeight: 700, color: "#eef5ff" }}>{data.pair}</div>
-            <div style={{ fontFamily: "'Courier New',monospace", fontSize: 10, color: sc }}>{data.signal.toUpperCase()}</div>
-          </div>
-          <div style={{ fontSize: 10, color: "#ccdde8", marginBottom: 8 }}>{data.context}</div>
-          <button onClick={() => onDeepScan && onDeepScan(data.pair)} style={{ padding: "4px 8px", background: "rgba(34,204,136,.1)", border: "1px solid rgba(34,204,136,.28)", borderRadius: 6, color: "#22dd88", cursor: "pointer", fontSize: 9 }}>🔬 Скан</button>
-        </div>
-      );
-    }
-
-    function TradeDecisionCard({ decision }) {
-      if (!decision) return null;
-      return (
-        <div style={{ background: decision.bgColor || "rgba(12,18,28,.95)", border: `2px solid ${decision.borderColor || "rgba(100,160,220,.3)"}`, borderRadius: 16, padding: "16px 14px", marginBottom: 12 }}>
-          <div style={{ fontFamily: "'Courier New',monospace", fontSize: 10, color: "#aabbdd", letterSpacing: "2px", marginBottom: 12, fontWeight: 700 }}>◈ АНАЛИЗ СИТУАЦИИ</div>
-          <div style={{ fontFamily: "'Courier New',monospace", fontSize: 16, fontWeight: 700, color: decision.color, marginBottom: 6 }}>{decision.score}/100 — {decision.verdict === "trade_now" ? "ТОРГОВАТЬ СЕЙЧАС" : decision.verdict === "wait" ? "ПОДОЖДАТЬ" : "НЕ ТОРГОВАТЬ"}</div>
-          <div style={{ fontSize: 12, color: "#ccdde8" }}>{decision.message}</div>
-        </div>
-      );
-    }
-
-    // 🔴 ТОТ САМЫЙ ПОТЕРЯННЫЙ КОМПОНЕНТ 🔴
-    function WebResearchCard({ research, loading, error, pair }) {
-      if (loading) return (
-        <div style={{ background: "rgba(12,18,28,.95)", border: "1px solid rgba(127,179,224,.25)", borderRadius: 12, padding: "14px", marginBottom: 12 }}>
-          <div style={{ fontFamily: "'Courier New',monospace", fontSize: 10, color: "#7fb3e0", letterSpacing: 2, marginBottom: 8, fontWeight: 700 }}>🌐 ВЕБ-РЕСЁРЧ...</div>
-        </div>
-      );
-      if (error) return (
-        <div style={{ background: "rgba(12,18,28,.95)", border: "1px solid rgba(255,68,85,.25)", borderRadius: 12, padding: "12px 14px", marginBottom: 12 }}>
-          <div style={{ fontFamily: "'Courier New',monospace", fontSize: 10, color: "#ff8899", letterSpacing: 2, marginBottom: 4, fontWeight: 700 }}>🌐 ОШИБКА РЕСЁРЧА</div>
-          <div style={{ fontSize: 11, color: "#cc8888" }}>{error}</div>
-        </div>
-      );
-      if (!research) return null;
-      return (
-        <div style={{ background: "rgba(8,16,30,.98)", border: "1px solid rgba(127,179,224,.3)", borderRadius: 12, padding: "14px", marginBottom: 12 }}>
-          <div style={{ fontFamily: "'Courier New',monospace", fontSize: 10, color: "#7fb3e0", letterSpacing: 2, marginBottom: 10, fontWeight: 700 }}>🌐 ВЕБ-РЕСЁРЧ · {pair}</div>
-          {research.price && (
-            <div style={{ marginBottom: 10 }}>
-              <div style={{ fontFamily: "'Courier New',monospace", fontSize: 24, fontWeight: 700, color: "#ddeeff" }}>{research.price}</div>
-              <div style={{ fontSize: 9, color: "#7fb3e0" }}>Сентимент: {research.sentiment}</div>
-            </div>
-          )}
-          {research.news_summary && <div style={{ fontSize: 11, color: "#ccdde8" }}>{research.news_summary}</div>}
-        </div>
-      );
-    }
-
-    // ─── Главное приложение ───
+    // --- Главный Компонент Приложения ---
     function App() {
-      const [pair, setPair] = useState("EUR/USD");
+      const[pair, setPair] = useState("EUR/USD");
       const [loading, setLoading] = useState(false);
+      const [progress, setProgress] = useState(0);
+      const [loadingText, setLoadingText] = useState("");
+      
       const [result, setResult] = useState(null);
       const [error, setError] = useState(null);
-      const[scanTime, setScanTime] = useState(null);
       const [clock, setClock] = useState(getMoscowTime());
-      const [session, setSession] = useState(getSession());
-      const [tab, setTab] = useState("scan");
-      const [mode, setMode] = useState("deep");
-      const[multiResults, setMultiResults] = useState([]);
-      const [multiLoading, setMultiLoading] = useState(false);
-      const [livePrice, setLivePrice] = useState(null);
-      const[webResearch, setWebResearch] = useState(null);
-      const [webResLoading, setWebResLoading] = useState(false);
-      const [webResError, setWebResError] = useState(null);
 
-      const pairRef = useRef(pair);
-      pairRef.current = pair;
+      // Часы
+      useEffect(() => {
+        const iv = setInterval(() => setClock(getMoscowTime()), 1000);
+        return () => clearInterval(iv);
+      },[]);
 
-      useEffect(() => { const iv = setInterval(() => { setClock(getMoscowTime()); setSession(getSession()); }, 1000); return () => clearInterval(iv); },[]);
-
-      const doFetch = async (prompt, tokens = 2000, parseAsArray = false) => {
-        const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), 28000);
-        try {
-          const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
-            signal: controller.signal, method: "POST", headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ contents: [{ parts:[{ text: prompt }] }], generationConfig: { maxOutputTokens: tokens, responseMimeType: "application/json" } })
+      // Эффект прогресс-бара
+      useEffect(() => {
+        if (!loading) {
+          setProgress(0);
+          return;
+        }
+        const texts =[
+          "Подключение к серверам API...",
+          "Сбор котировок в реальном времени...",
+          "Запрос к нейросети Gemini...",
+          "Анализ структуры и уровней...",
+          "Формирование торгового плана..."
+        ];
+        let step = 0;
+        setLoadingText(texts[0]);
+        
+        const interval = setInterval(() => {
+          setProgress(p => {
+            const next = p + Math.random() * 15;
+            return next > 90 ? 90 : next; // Зависаем на 90%, пока не придет ответ
           });
-          const txt = await res.text();
-          if (!res.ok) throw new Error(`HTTP ${res.status}: ${txt.slice(0, 200)}`);
-          const data = JSON.parse(txt);
-          if (data.error) throw new Error(data.error.message);
-          const raw = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
-          if (!raw) throw new Error(`Пустой ответ от модели`);
-          return parseAsArray ? extractJSONArray(raw) : extractJSON(raw);
-        } catch (e) {
-          if (e.name === "AbortError") throw new Error("Таймаут. Попробуйте ещё раз.");
-          throw e;
-        } finally { clearTimeout(timer); }
-      };
-
-      const scan = async () => {
-        if (loading) return;
-        setLoading(true); setError(null); setResult(null); setTab("scan"); setWebResearch(null); setWebResError(null);
-        try {
-          const now = new Date();
-          const dateStr = now.toLocaleDateString("ru-RU", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
-          const timeStr = now.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Moscow" });
-          const prices = await fetchLivePrices([pairRef.current]);
-          const fetchedPrice = prices[pairRef.current] || null;
-          setLivePrice(fetchedPrice);
-          let parsed = null;
-          try {
-            const prompt = mode === "deep" ? buildDeepPrompt(pairRef.current, dateStr, timeStr, fetchedPrice) : buildQuickPrompt(pairRef.current, dateStr, timeStr, fetchedPrice);
-            parsed = await doFetch(prompt, mode === "deep" ? 2000 : 1000);
-          } catch (aiErr) {
-            console.warn("AI недоступен, офлайн-режим:", aiErr.message);
-            parsed = offlineAnalysis(pairRef.current, fetchedPrice, mode === "deep");
-            setError("⚠ AI недоступен — показан технический анализ (офлайн-режим)");
+          step++;
+          if (step % 3 === 0 && step / 3 < texts.length) {
+            setLoadingText(texts[step / 3]);
           }
-          if (!parsed) throw new Error("Нет ответа.");
+        }, 600);
+        return () => clearInterval(interval);
+      }, [loading]);
+
+      const startScan = async () => {
+        if (loading) return;
+        setLoading(true);
+        setError(null);
+        setResult(null);
+
+        try {
+          const now = new Date().toLocaleDateString("ru-RU");
+          
+          // 1. Получаем цены
+          setLoadingText("Получение котировок...");
+          const prices = await fetchLivePrices([pair]);
+          const currentPrice = prices[pair] || null;
+
+          // 2. Делаем запрос к Gemini
+          const prompt = buildPrompt(pair, now, currentPrice);
+          const requestBody = {
+            contents: [{ parts:[{ text: prompt }] }],
+            generationConfig: { responseMimeType: "application/json" }
+          };
+
+          // Вы можете поменять 1.5-flash на gemini-pro, если ключ не работает
+          const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(requestBody)
+          });
+
+          if (!res.ok) {
+            throw new Error(`Ошибка API (VPN выключен или ключ неверный)`);
+          }
+
+          const data = await res.json();
+          const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+          
+          if (!rawText) throw new Error("Пустой ответ от ИИ");
+
+          let parsed = extractJSON(rawText);
+          
+          // Корректируем R:R математически
           if (parsed.buy) parsed.buy = enforceRR(parsed.buy, true);
           if (parsed.sell) parsed.sell = enforceRR(parsed.sell, false);
-          setResult(parsed);
-          setScanTime(new Date().toLocaleTimeString("ru-RU"));
-          vibe([40, 20, 40]);
-        } catch (e) { setError(e.message || "Ошибка. Попробуйте ещё раз."); } finally { setLoading(false); }
+          
+          setProgress(100);
+          setLoadingText("Анализ завершен!");
+          setTimeout(() => {
+            setResult(parsed);
+            setLoading(false);
+          }, 400);
+
+        } catch (err) {
+          console.warn("Сбой ИИ, переход в офлайн:", err);
+          // В случае ошибки показываем офлайн-расчет, чтобы приложение не висело
+          const fallback = offlineAnalysis(pair, 1.1000, true);
+          setProgress(100);
+          setTimeout(() => {
+            setResult(fallback);
+            setError(`Нейросеть недоступна (${err.message}). Показан математический расчет.`);
+            setLoading(false);
+          }, 400);
+        }
       };
 
-      const scanAll = async () => {
-        if (multiLoading) return;
-        setMultiLoading(true); setMultiResults([]); setTab("multi");
-        try {
-          const now = new Date();
-          const dStr = now.toLocaleDateString("ru-RU"), tStr = now.toLocaleTimeString("ru-RU");
-          const prices = await fetchLivePrices(PAIRS);
-          const b1 = PAIRS.slice(0, 4), b2 = PAIRS.slice(4);
-          let r1 = [], r2 =[];
-          try { const res = await doFetch(buildMultiPrompt(b1, dStr, tStr, prices), 1000, true); r1 = Array.isArray(res) ? res.map((d, i) => ({ ...d, pair: d.pair || b1[i] })) :[]; } catch (e) { r1 = offlineMultiAnalysis(b1, prices); }
-          try { const res = await doFetch(buildMultiPrompt(b2, dStr, tStr, prices), 1000, true); r2 = Array.isArray(res) ? res.map((d, i) => ({ ...d, pair: d.pair || b2[i] })) :[]; } catch (e) { r2 = offlineMultiAnalysis(b2, prices); }
-          setMultiResults([...r1, ...r2]);
-        } catch (e) { setError(e.message); } finally { setMultiLoading(false); }
-      };
-
-      const runWebResearch = async () => {
-        if (webResLoading) return;
-        setWebResLoading(true); setWebResearch(null); setWebResError(null);
-        try {
-          const r = await fetchWebResearch(pairRef.current);
-          if (!r) throw new Error("Не удалось получить данные.");
-          setWebResearch(r); vibe([30, 15, 30]);
-        } catch (e) { setWebResError(e.message); } finally { setWebResLoading(false); }
-      };
-
-      const deepScanFromMulti = p => { setPair(p); pairRef.current = p; setMode("deep"); setTab("scan"); setResult(null); };
-      const isQuick = result?.mode === "quick";
-      const currentPrice = result?.buy?.entry_num || result?.sell?.entry_num || result?.entry_num || livePrice;
-      const tradeDecision = result ? evaluateTradeDecision(result, session) : null;
-
+      // РЕНДЕР ИНТЕРФЕЙСА
       return (
         <div>
-          {/* Шапка */}
-          <div style={{ position: "sticky", top: 0, zIndex: 100, background: "rgba(6,12,20,.98)", borderBottom: "1px solid rgba(100,160,220,.14)", padding: "10px 14px" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-              <div style={{ fontFamily: "'Courier New',monospace", fontSize: 13, fontWeight: 700, color: "#22cc88" }}>FX SCANNER PRO</div>
-              <div style={{ fontFamily: "'Courier New',monospace", fontSize: 13, fontWeight: 700 }}>{clock}</div>
+          {/* Верхняя панель */}
+          <div style={{ position: "sticky", top: 0, zIndex: 100, background: "rgba(11, 17, 32, 0.95)", backdropFilter: "blur(10px)", borderBottom: "1px solid var(--border-color)", padding: "12px 16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div>
+              <div style={{ fontWeight: 700, color: "var(--text-main)", fontSize: "16px" }}>
+                FX AI <span style={{ color: "var(--color-buy)" }}>Сканнер</span>
+              </div>
+              <div style={{ fontSize: "10px", color: "var(--text-muted)" }}>Gemini Pro Engine</div>
             </div>
-            <div style={{ display: "flex", gap: 6 }}>
-              <button onClick={() => setTab("scan")} style={{ padding: "6px 11px", background: tab === "scan" ? "#22cc88" : "transparent", color: tab === "scan" ? "#000" : "#8899aa", border: "1px solid #22cc88", borderRadius: 6, fontWeight: 700 }}>АНАЛИЗ</button>
-              <button onClick={() => setTab("multi")} style={{ padding: "6px 11px", background: tab === "multi" ? "#22cc88" : "transparent", color: tab === "multi" ? "#000" : "#8899aa", border: "1px solid #22cc88", borderRadius: 6, fontWeight: 700 }}>МУЛЬТИ</button>
+            <div className="mono" style={{ fontWeight: 700, fontSize: "14px", color: "var(--color-info)" }}>
+              {clock} МСК
             </div>
           </div>
 
-          <div style={{ padding: "12px 12px 110px" }}>
-            {tab === "multi" && (
-              <>
-                {multiLoading && <div style={{ color: "#22cc88", textAlign: "center", margin: 20 }}>СКАНИРОВАНИЕ...</div>}
-                {!multiLoading && multiResults.map((d, i) => <QuickSignalCard key={i} data={d} onDeepScan={deepScanFromMulti} />)}
-              </>
+          <div style={{ padding: "16px", paddingBottom: "100px" }}>
+            
+            {/* Выбор пары */}
+            <div style={{ marginBottom: "20px" }}>
+              <div style={{ fontSize: "12px", color: "var(--text-muted)", marginBottom: "8px", fontWeight: 600 }}>ВЫБЕРИТЕ ПАРУ:</div>
+              <div style={{ display: "flex", gap: "8px", overflowX: "auto", paddingBottom: "8px" }}>
+                {PAIRS.map(p => (
+                  <button 
+                    key={p} 
+                    onClick={() => { setPair(p); setResult(null); setError(null); }}
+                    style={{
+                      flexShrink: 0,
+                      background: p === pair ? "var(--color-buy-bg)" : "var(--bg-card)",
+                      border: `1px solid ${p === pair ? "var(--color-buy)" : "var(--border-color)"}`,
+                      color: p === pair ? "var(--color-buy)" : "var(--text-main)",
+                      padding: "10px 16px",
+                      borderRadius: "12px",
+                      fontWeight: 600,
+                      fontSize: "14px"
+                    }}
+                  >
+                    {p}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Блок загрузки (Прогресс бар) */}
+            {loading && (
+              <div className="card" style={{ textAlign: "center", padding: "30px 20px" }}>
+                <div style={{ fontSize: "24px", marginBottom: "12px", animation: "pulse 1.5s infinite" }}>🤖</div>
+                <div style={{ fontWeight: 600, color: "var(--color-info)", marginBottom: "8px" }}>Анализирую {pair}...</div>
+                <div style={{ fontSize: "12px", color: "var(--text-muted)", height: "16px" }}>{loadingText}</div>
+                <div className="progress-bar-container">
+                  <div className="progress-bar-fill" style={{ width: `${progress}%` }}></div>
+                </div>
+              </div>
             )}
 
-            {tab === "scan" && (
-              <>
-                <div style={{ display: "flex", gap: 7, overflowX: "auto", marginBottom: 12, paddingBottom: 5 }}>
-                  {PAIRS.map(p => (<div key={p} onClick={() => { setPair(p); pairRef.current = p; setResult(null); }} style={{ flexShrink: 0, background: p === pair ? "rgba(34,204,136,.15)" : "#111d2a", border: `1px solid ${p === pair ? "#22cc88" : "#223344"}`, borderRadius: 20, padding: "8px 14px", fontSize: 12, color: p === pair ? "#22dd88" : "#aabbcc", cursor: "pointer", fontWeight: 700 }}>{p}</div>))}
-                </div>
-
-                <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
-                  <div onClick={() => setMode("quick")} style={{ flex: 1, padding: 10, background: mode === "quick" ? "rgba(127,179,224,.1)" : "#111d2a", border: `1px solid ${mode === "quick" ? "#7fb3e0" : "#223344"}`, borderRadius: 10, textAlign: "center", color: mode === "quick" ? "#7fb3e0" : "#8899aa", fontWeight: 700 }}>⚡ БЫСТРЫЙ</div>
-                  <div onClick={() => setMode("deep")} style={{ flex: 1, padding: 10, background: mode === "deep" ? "rgba(34,204,136,.1)" : "#111d2a", border: `1px solid ${mode === "deep" ? "#22cc88" : "#223344"}`, borderRadius: 10, textAlign: "center", color: mode === "deep" ? "#22cc88" : "#8899aa", fontWeight: 700 }}>🔬 ГЛУБОКИЙ</div>
-                </div>
-
-                <button onClick={runWebResearch} disabled={webResLoading} style={{ width: "100%", padding: "12px", background: "rgba(127,179,224,.08)", border: "1px solid rgba(127,179,224,.3)", borderRadius: 10, color: "#7fb3e0", fontWeight: 700, marginBottom: 12 }}>🌐 ВЕБ-РЕСЁРЧ</button>
-                <WebResearchCard research={webResearch} loading={webResLoading} error={webResError} pair={pair} />
-
-                {error && <div style={{ color: "#ff6677", background: "rgba(255,68,85,.1)", padding: 12, borderRadius: 8, marginBottom: 12 }}>{error}</div>}
-                {loading && <div style={{ textAlign: "center", padding: 20, color: "#22cc88", fontWeight: 700 }}>АНАЛИЗИРУЮ...</div>}
-
-                {result && !loading && !isQuick && (
-                  <>
-                    <TradeDecisionCard decision={tradeDecision} />
-                    <MarketRegimeCard regime={result.market_regime} />
-                    <ConfidenceMeter score={result.confidence?.score} breakdown={result.confidence?.breakdown} />
-                    {result.no_trade && <NoTradeCard noTrade={result.no_trade} />}
-                    {(result.ob_fvg || result.buy || result.sell) && <OBFVGChart obfvg={result.ob_fvg} buy={result.buy} sell={result.sell} />}
-                    <SRLevelsCard levels={result.sr_levels} currentPrice={currentPrice} />
-                    <NewsCard news={result.news} />
-                    <MTFCard mtf={result.mtf} />
-                    <TipsCard tips={result.tips} />
-                    <SetupCard data={result.buy} isBuy={true} pair={pair} />
-                    <SetupCard data={result.sell} isBuy={false} pair={pair} />
-                  </>
-                )}
-
-                {result && !loading && isQuick && (
-                  <>
-                    <TradeDecisionCard decision={tradeDecision} />
-                    {result.signal === "no_trade" ? <NoTradeCard noTrade={{ reason: result.no_trade_reason || "Нет сетапа" }} /> : <SetupCard data={result} isBuy={result.signal === "buy"} pair={pair} />}
-                  </>
-                )}
-              </>
+            {/* Вывод ошибки */}
+            {error && !loading && (
+              <div style={{ background: "var(--color-sell-bg)", border: "1px solid var(--color-sell)", padding: "12px", borderRadius: "12px", color: "#FCA5A5", fontSize: "12px", marginBottom: "16px", lineHeight: 1.5 }}>
+                {error}
+                <br/>💡 Убедитесь, что ваш VPN включен и ключ Gemini верен.
+              </div>
             )}
+
+            {/* Вывод результата */}
+            {result && !loading && (
+              <div>
+                <div className="card">
+                  <div style={{ fontSize: "11px", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "1px", marginBottom: "8px" }}>Сводка ИИ</div>
+                  <div style={{ fontSize: "14px", lineHeight: 1.6, color: "var(--text-main)" }}>
+                    {result.context}
+                  </div>
+                </div>
+
+                {result.buy && (
+                  <div className="card" style={{ borderLeft: "4px solid var(--color-buy)" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+                      <div style={{ fontWeight: 700, color: "var(--color-buy)", fontSize: "16px" }}>🟢 ПОКУПКА (BUY)</div>
+                      <div className="mono" style={{ background: "var(--color-buy-bg)", color: "var(--color-buy)", padding: "4px 8px", borderRadius: "6px", fontSize: "12px", fontWeight: 700 }}>
+                        ВХОД: {result.buy.entry_num || result.buy.entry_zone}
+                      </div>
+                    </div>
+                    
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "16px" }}>
+                      <div style={{ background: "rgba(0,0,0,0.2)", padding: "10px", borderRadius: "8px" }}>
+                        <div style={{ fontSize: "10px", color: "var(--text-muted)", marginBottom: "4px" }}>STOP LOSS</div>
+                        <div className="mono" style={{ color: "var(--color-sell)", fontWeight: 700, fontSize: "15px" }}>{result.buy.sl_num || result.buy.sl}</div>
+                      </div>
+                      <div style={{ background: "rgba(0,0,0,0.2)", padding: "10px", borderRadius: "8px" }}>
+                        <div style={{ fontSize: "10px", color: "var(--text-muted)", marginBottom: "4px" }}>TAKE PROFIT 1</div>
+                        <div className="mono" style={{ color: "var(--color-buy)", fontWeight: 700, fontSize: "15px" }}>{result.buy.tp1_num || result.buy.tp1}</div>
+                      </div>
+                    </div>
+                    
+                    <div style={{ fontSize: "12px", color: "var(--text-muted)", borderTop: "1px solid var(--border-color)", paddingTop: "12px" }}>
+                      <strong>Обоснование:</strong> {result.buy.reasoning || "Алгоритмический расчет от уровней."}
+                    </div>
+                  </div>
+                )}
+
+                {result.sell && (
+                  <div className="card" style={{ borderLeft: "4px solid var(--color-sell)" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+                      <div style={{ fontWeight: 700, color: "var(--color-sell)", fontSize: "16px" }}>🔴 ПРОДАЖА (SELL)</div>
+                      <div className="mono" style={{ background: "var(--color-sell-bg)", color: "var(--color-sell)", padding: "4px 8px", borderRadius: "6px", fontSize: "12px", fontWeight: 700 }}>
+                        ВХОД: {result.sell.entry_num || result.sell.entry_zone}
+                      </div>
+                    </div>
+                    
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "16px" }}>
+                      <div style={{ background: "rgba(0,0,0,0.2)", padding: "10px", borderRadius: "8px" }}>
+                        <div style={{ fontSize: "10px", color: "var(--text-muted)", marginBottom: "4px" }}>STOP LOSS</div>
+                        <div className="mono" style={{ color: "var(--color-sell)", fontWeight: 700, fontSize: "15px" }}>{result.sell.sl_num || result.sell.sl}</div>
+                      </div>
+                      <div style={{ background: "rgba(0,0,0,0.2)", padding: "10px", borderRadius: "8px" }}>
+                        <div style={{ fontSize: "10px", color: "var(--text-muted)", marginBottom: "4px" }}>TAKE PROFIT 1</div>
+                        <div className="mono" style={{ color: "var(--color-buy)", fontWeight: 700, fontSize: "15px" }}>{result.sell.tp1_num || result.sell.tp1}</div>
+                      </div>
+                    </div>
+                    
+                    <div style={{ fontSize: "12px", color: "var(--text-muted)", borderTop: "1px solid var(--border-color)", paddingTop: "12px" }}>
+                      <strong>Обоснование:</strong> {result.sell.reasoning || "Алгоритмический расчет от уровней."}
+                    </div>
+                  </div>
+                )}
+
+                {result.sr_levels && result.sr_levels.length > 0 && (
+                  <div className="card">
+                    <div style={{ fontSize: "11px", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "1px", marginBottom: "12px" }}>Ключевые уровни</div>
+                    {result.sr_levels.map((lvl, idx) => (
+                      <div key={idx} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: idx !== result.sr_levels.length - 1 ? "1px solid var(--border-color)" : "none" }}>
+                        <div style={{ fontSize: "12px", color: lvl.type === "support" ? "var(--color-buy)" : "var(--color-sell)", fontWeight: 600 }}>
+                          {lvl.type === "support" ? "ПОДДЕРЖКА" : "СОПРОТИВЛЕНИЕ"}
+                        </div>
+                        <div className="mono" style={{ fontSize: "13px", fontWeight: 700 }}>{lvl.price}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+              </div>
+            )}
+
+            {/* Приветственный экран (пока не нажали кнопку) */}
+            {!result && !loading && !error && (
+               <div className="card" style={{ textAlign: "center", padding: "40px 20px", background: "transparent", border: "1px dashed var(--border-color)" }}>
+                 <div style={{ fontSize: "40px", opacity: 0.5, marginBottom: "16px" }}>⚡</div>
+                 <div style={{ fontWeight: 600, color: "var(--text-main)", marginBottom: "8px" }}>Сканнер готов к работе</div>
+                 <div style={{ fontSize: "13px", color: "var(--text-muted)", lineHeight: 1.5 }}>
+                   Нажмите кнопку ниже, чтобы запустить глубокий анализ структуры рынка, объемов и уровней для выбранной пары.
+                 </div>
+               </div>
+            )}
+
           </div>
 
-          {/* Нижние кнопки */}
-          <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 100, background: "rgba(6,12,20,.98)", borderTop: "1px solid rgba(100,160,220,.14)", padding: "10px 12px 14px", display: "flex", gap: 8 }}>
-            <button onClick={scan} disabled={loading} style={{ flex: 2, height: 54, background: loading ? "#112211" : "#22cc88", border: "none", borderRadius: 12, color: loading ? "#558866" : "#000", fontWeight: 700, fontSize: 16 }}>◈ СКАНИРОВАТЬ</button>
-            <button onClick={() => { setTab("multi"); if (!multiLoading) scanAll(); }} disabled={multiLoading} style={{ flex: 1, height: 54, background: "rgba(127,179,224,.1)", border: "1px solid #7fb3e0", borderRadius: 12, color: "#7fb3e0", fontWeight: 700 }}>⚡ ВСЕ</button>
+          {/* Нижняя фиксированная кнопка */}
+          <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, padding: "16px", background: "rgba(11, 17, 32, 0.95)", backdropFilter: "blur(10px)", borderTop: "1px solid var(--border-color)" }}>
+            <button 
+              onClick={startScan} 
+              disabled={loading}
+              style={{
+                width: "100%",
+                padding: "16px",
+                background: loading ? "var(--bg-hover)" : "var(--color-buy)",
+                color: loading ? "var(--text-muted)" : "#fff",
+                border: "none",
+                borderRadius: "12px",
+                fontSize: "16px",
+                fontWeight: 700,
+                boxShadow: loading ? "none" : "0 4px 14px rgba(16, 185, 129, 0.4)"
+              }}
+            >
+              {loading ? "ИДЕТ АНАЛИЗ..." : `🚀 СКАНИРОВАТЬ ${pair}`}
+            </button>
           </div>
         </div>
       );
     }
 
-    // Запуск React в браузере
+    // Рендер приложения
     const root = ReactDOM.createRoot(document.getElementById('root'));
     root.render(<App />);
   </script>
