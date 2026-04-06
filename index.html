@@ -3,28 +3,25 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FX Scanner Pro v7 | Институциональный Анализ</title>
+    <title>FX Scanner Pro v7.1 | Безопасный Анализ</title>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://unpkg.com/lightweight-charts@4.1.0/dist/lightweight-charts.standalone.production.js"></script>
     <style>
         *{box-sizing:border-box;margin:0;padding:0}
-        body{background:#0a0c10;color:#e8eaed;font-family:'Inter','SF Pro Display',system-ui,sans-serif;overflow-x:hidden;line-height:1.6}
+        body{background:#0a0c10;color:#e8eaed;font-family:'Inter',system-ui,sans-serif;overflow-x:hidden}
         ::-webkit-scrollbar{width:6px;height:6px}
         ::-webkit-scrollbar-track{background:rgba(255,255,255,0.03)}
         ::-webkit-scrollbar-thumb{background:rgba(100,130,200,0.4);border-radius:3px}
-        @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(0.98)}}
-        @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
-        @keyframes slideIn{from{opacity:0;transform:translateY(30px)}to{opacity:1;transform:translateY(0)}}
-        @keyframes glow{0%,100%{box-shadow:0 0 20px rgba(34,204,136,0.2)}50%{box-shadow:0 0 40px rgba(34,204,136,0.5)}}
+        @keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
         @keyframes rotate{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+        @keyframes slideIn{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
         .glass{background:rgba(20,24,35,0.8);backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,0.06)}
-        .gradient-text{background:linear-gradient(135deg,#00d4aa,#00a8e8,#f0d060);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
-        .neon-border{box-shadow:0 0 20px rgba(0,212,170,0.3),inset 0 0 20px rgba(0,212,170,0.1)}
-        .killzone-pulse{animation:pulse 2s cubic-bezier(0.4,0,0.6,1) infinite}
-        .shimmer-bg{background:linear-gradient(90deg,transparent,rgba(255,255,255,0.1),transparent);background-size:200% 100%;animation:shimmer 2s infinite}
-        .chart-container{position:relative;height:400px;width:100%;border-radius:16px;overflow:hidden}
+        .gradient-text{background:linear-gradient(135deg,#00d4aa,#00a8e8);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+        .killzone-pulse{animation:pulse 2s infinite}
+        .error-fallback{padding:40px;text-align:center;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);border-radius:16px;margin:20px}
+        .chart-container{position:relative;height:400px;width:100%;border-radius:12px;overflow:hidden}
     </style>
 </head>
 <body>
@@ -34,1204 +31,630 @@
         const {createChart,ColorType}=window.LightweightCharts;
         
         // ═══════════════════════════════════════════════════════════════════════════════
-        // КОНФИГУРАЦИЯ И КОНСТАНТЫ (ПОЛНОСТЬЮ НА РУССКОМ)
+        // ERROR BOUNDARY - Защита от падений [^44^][^45^]
         // ═══════════════════════════════════════════════════════════════════════════════
         
-        const ВАЛЮТНЫЕ_ПАРЫ=[
-            {пара:"EUR/USD",тип:"мажор",спред:0.1,волатильность:"средняя",dxyВес:-0.85,сессии:["Лондон","Нью-Йорк"],ликвидность:"высокая"},
-            {пара:"GBP/USD",тип:"мажор",спред:0.2,волатильность:"высокая",dxyВес:-0.9,сессии:["Лондон","Нью-Йорк"],ликвидность:"высокая"},
-            {пара:"USD/JPY",тип:"мажор",спред:0.2,волатильность:"средняя",dxyВес:0.88,сессии:["Токио","Лондон","Нью-Йорк"],ликвидность:"высокая"},
-            {пара:"AUD/USD",тип:"товарная",спред:0.3,волатильность:"высокая",dxyВес:-0.75,сессии:["Сидней","Лондон","Нью-Йорк"],ликвидность:"средняя"},
-            {пара:"USD/CAD",тип:"товарная",спред:0.3,волатильность:"средняя",dxyВес:0.8,сессии:["Торонто","Лондон","Нью-Йорк"],ликвидность:"средняя"},
-            {пара:"NZD/USD",тип:"товарная",спред:0.4,волатильность:"высокая",dxyВес:-0.7,сессии:["Веллингтон","Лондон","Нью-Йорк"],ликвидность:"низкая"},
-            {пара:"USD/CHF",тип:"мажор",спред:0.2,волатильность:"низкая",dxyВес:0.82,сессии:["Лондон","Нью-Йорк"],ликвидность:"средняя"},
-            {пара:"GBP/JPY",тип:"кросс",спред:0.8,волатильность:"экстремальная",dxyВес:0.05,сессии:["Лондон","Нью-Йорк"],ликвидность:"средняя"},
-            {пара:"EUR/GBP",тип:"кросс",спред:0.3,волатильность:"низкая",dxyВес:-0.15,сессии:["Лондон"],ликвидность:"средняя"},
-            {пара:"AUD/JPY",тип:"кросс",спред:0.6,волатильность:"высокая",dxyВес:0.12,сессии:["Сидней","Лондон","Нью-Йорк"],ликвидность:"средняя"},
-            {пара:"EUR/JPY",тип:"кросс",спред:0.4,волатильность:"средняя",dxyВес:0.08,сессии:["Токио","Лондон","Нью-Йорк"],ликвидность:"высокая"},
-            {пара:"XAU/USD",тип:"металл",спред:0.15,волатильность:"высокая",dxyВес:-0.6,сессии:["Лондон","Нью-Йорк"],ликвидность:"высокая"}
-        ];
-
-        const КИЛЛ_ЗОНЫ=[
-            {название:"Токио",начало:2,конец:5,цвет:"#3b82f6",иконка:"🌏",описание:"Азиатская сессия",премиум:false},
-            {название:"Лондон",начало:10,конец:14,цвет:"#10b981",иконка:"🏰",описание:"Европейская сессия",премиум:true},
-            {название:"Нью-Йорк AM",начало:16,конец:17,цвет:"#f59e0b",иконка:"🗽",описание:"Открытие NY",премиум:true},
-            {название:"Нью-Йорк PM",начало:20,конец:22,цвет:"#ef4444",иконка:"🌆",описание:"Закрытие NY",премиум:true},
-            {название:"Сидней",начало:0,конец:2,цвет:"#8b5cf6",иконка:"🦘",описание:"Тихоокеанская сессия",премиум:false}
-        ];
-
-        const WYCKOFF_ФАЗЫ=[
-            {код:"A",название:"Фаза A",описание:"Остановка тренда",цвет:"#f59e0b"},
-            {код:"B",название:"Фаза B",описание:"Накопление причины",цвет:"#3b82f6"},
-            {код:"C",название:"Фаза C",описание:"Тест (Spring/UTAD)",цвет:"#8b5cf6"},
-            {код:"D",название:"Фаза D",описание:"Сигнал силы/слабости",цвет:"#10b981"},
-            {код:"E",название:"Фаза E",описание:"Начало тренда",цвет:"#22d3ee"}
-        ];
-
-        const ЭКОНОМИЧЕСКИЕ_СОБЫТИЯ=[
-            {время:"08:30",название:"NFP (Non-Farm Payrolls)",важность:"высокая",валюта:"USD",влияние:"высокое"},
-            {время:"14:00",название:"FOMC (Решение по ставке)",важность:"высокая",валюта:"USD",влияние:"экстремальное"},
-            {время:"08:15",название:"ADP Employment",важность:"средняя",валюта:"USD",влияние:"среднее"},
-            {время:"10:00",название:"ECB (Пресс-конференция)",важность:"высокая",валюта:"EUR",влияние:"высокое"},
-            {время:"04:30",название:"Tokyo CPI",важность:"средняя",валюта:"JPY",влияние:"среднее"},
-            {время:"14:30",название:"EIA Нефть",важность:"средняя",валюта:"USD",влияние:"среднее"},
-            {время:"12:00",название:"GBP CPI",важность:"высокая",валюта:"GBP",влияние:"высокое"},
-            {время:"02:30",название:"AUD Employment",важность:"средняя",валюта:"AUD",влияние:"среднее"}
-        ];
-
-        // ═══════════════════════════════════════════════════════════════════════════════
-        // УТИЛИТЫ И МАТЕМАТИКА
-        // ═══════════════════════════════════════════════════════════════════════════════
-        
-        const получитьВремяМосква=()=>new Date().toLocaleTimeString("ru-RU",{hour:"2-digit",minute:"2-digit",second:"2-digit",timeZone:"Europe/Moscow"});
-        const получитьЧасМосква=()=>parseInt(new Date().toLocaleTimeString("ru-RU",{hour:"2-digit",timeZone:"Europe/Moscow"}));
-        const получитьДатуМосква=()=>new Date().toLocaleDateString("ru-RU",{day:"numeric",month:"long",weekday:"short",timeZone:"Europe/Moscow"});
-
-        function расчетКорреляции(массив1,массив2,период=20){
-            const n=Math.min(период,массив1.length,массив2.length);
-            if(n<2)return 0;
-            const срез1=массив1.slice(-n);
-            const срез2=массив2.slice(-n);
-            const сред1=срез1.reduce((a,b)=>a+b,0)/n;
-            const сред2=срез2.reduce((a,b)=>a+b,0)/n;
-            let числ=0,знам1=0,знам2=0;
-            for(let i=0;i<n;i++){
-                const о1=срез1[i]-сред1;
-                const о2=срез2[i]-сред2;
-                числ+=о1*о2;
-                знам1+=о1*о1;
-                знам2+=о2*о2;
+        class ErrorBoundary extends React.Component {
+            constructor(props) {
+                super(props);
+                this.state = { hasError: false, error: null };
             }
-            return знам1===0||знам2===0?0:числ/Math.sqrt(знам1*знам2);
-        }
-
-        function расчетRSI(цены,период=14){
-            if(цены.length<период+1)return 50;
-            let прирост=0,падение=0;
-            for(let i=цены.length-период;i<цены.length;i++){
-                const изменение=цены[i]-цены[i-1];
-                if(изменение>0)прирост+=изменение;
-                else падение+=Math.abs(изменение);
-            }
-            const средПрирост=прирост/период;
-            const средПадение=падение/период;
-            const rs=средПрирост/средПадение;
-            return 100-(100/(1+rs));
-        }
-
-        function расчетMACD(цены,быстрый=12,медленный=26,сигнал=9){
-            const ema=(данные,период)=>{
-                const k=2/(период+1);
-                let ema=[данные[0]];
-                for(let i=1;i<данные.length;i++){
-                    ema.push(данные[i]*k+ema[i-1]*(1-k));
-                }
-                return ema;
-            };
-            const emaБыстрая=ema(цены,быстрый);
-            const emaМедленная=ema(цены,медленный);
-            const macdLine=emaБыстрая.map((v,i)=>v-emaМедленная[i]);
-            const signalLine=ema(macdLine.slice(медленный-быстрый),сигнал);
-            const гистограмма=macdLine.slice(медленный-быстрый+сигнал-1).map((v,i)=>v-signalLine[i]);
-            return{macd:macdLine[macdLine.length-1],signal:signalLine[signalLine.length-1],histogram:гистограмма[гистограмма.length-1]};
-        }
-
-        function расчетБоллинджера(цены,период=20,множитель=2){
-            if(цены.length<период)return{средняя:цены[цены.length-1],верх:цены[цены.length-1],низ:цены[цены.length-1]};
-            const срез=цены.slice(-период);
-            const средняя=срез.reduce((a,b)=>a+b,0)/период;
-            const квадраты=срез.map(ц=>(ц-средняя)**2);
-            const стандОтклон=Math.sqrt(квадраты.reduce((a,b)=>a+b,0)/период);
-            return{средняя,верх:средняя+множитель*стандОтклон,низ:средняя-множитель*стандОтклон};
-        }
-
-        // ═══════════════════════════════════════════════════════════════════════════════
-        // ГЕНЕРАТОР РЕАЛИСТИЧНЫХ ДАННЫХ
-        // ═══════════════════════════════════════════════════════════════════════════════
-        
-        function генерацияСвечей(базоваяЦена,количество=200,таймфрейм="1h",волатильность=0.001){
-            const свечи=[];
-            let цена=базоваяЦена;
-            const тренд=(Math.random()-0.5)*0.0002;
             
-            for(let i=0;i<количество;i++){
-                const время=Math.floor(Date.now()/1000)-(количество-i)*3600;
-                const изменение=(Math.random()-0.5)*волатильность*цена+тренд*цена;
-                const открытие=цена;
-                цена+=изменение;
-                const закрытие=цена;
-                const теньВерх=Math.random()*волатильность*цена*0.5;
-                const теньНиз=Math.random()*волатильность*цена*0.5;
+            static getDerivedStateFromError(error) {
+                return { hasError: true, error };
+            }
+            
+            componentDidCatch(error, errorInfo) {
+                console.error('Ошибка в компоненте:', error, errorInfo);
+            }
+            
+            render() {
+                if (this.state.hasError) {
+                    return (
+                        <div className="error-fallback">
+                            <div style={{fontSize:48,marginBottom:16}}>⚠️</div>
+                            <div style={{fontSize:18,color:"#ef4444",fontWeight:700,marginBottom:8}}>Произошла ошибка</div>
+                            <div style={{fontSize:13,color:"#9ca3af",marginBottom:16}}>{this.state.error?.message}</div>
+                            <button 
+                                onClick={() => window.location.reload()}
+                                style={{padding:"12px 24px",background:"#22cc88",border:"none",borderRadius:8,color:"#fff",fontWeight:700,cursor:"pointer"}}
+                            >
+                                Перезагрузить страницу
+                            </button>
+                        </div>
+                    );
+                }
+                return this.props.children;
+            }
+        }
+        
+        // ═══════════════════════════════════════════════════════════════════════════════
+        // БЕЗОПАСНЫЕ УТИЛИТЫ (с проверками)
+        // ═══════════════════════════════════════════════════════════════════════════════
+        
+        const безопасныйToFixed = (значение, знаки = 5) => {
+            if (значение === undefined || значение === null || isNaN(значение)) return "--";
+            try {
+                return Number(значение).toFixed(знаки);
+            } catch (e) {
+                return "--";
+            }
+        };
+        
+        const безопасноеЧисло = (значение, дефолт = 0) => {
+            if (значение === undefined || значение === null || isNaN(значение)) return дефолт;
+            return Number(значение);
+        };
+        
+        const получитьВремяМосква = () => {
+            try {
+                return new Date().toLocaleTimeString("ru-RU", {
+                    hour: "2-digit", 
+                    minute: "2-digit", 
+                    second: "2-digit", 
+                    timeZone: "Europe/Moscow"
+                });
+            } catch (e) {
+                return "--:--:--";
+            }
+        };
+        
+        const получитьЧасМосква = () => {
+            try {
+                return parseInt(new Date().toLocaleTimeString("ru-RU", {
+                    hour: "2-digit", 
+                    timeZone: "Europe/Moscow"
+                }));
+            } catch (e) {
+                return 12;
+            }
+        };
+        
+        // ═══════════════════════════════════════════════════════════════════════════════
+        // КОНФИГУРАЦИЯ
+        // ═══════════════════════════════════════════════════════════════════════════════
+        
+        const ВАЛЮТНЫЕ_ПАРЫ = [
+            {пара:"EUR/USD",тип:"мажор",dxyВес:-0.85,сессии:["Лондон","Нью-Йорк"]},
+            {пара:"GBP/USD",тип:"мажор",dxyВес:-0.9,сессии:["Лондон","Нью-Йорк"]},
+            {пара:"USD/JPY",тип:"мажор",dxyВес:0.88,сессии:["Токио","Лондон","Нью-Йорк"]},
+            {пара:"AUD/USD",тип:"товарная",dxyВес:-0.75,сессии:["Сидней","Лондон","Нью-Йорк"]},
+            {пара:"USD/CAD",тип:"товарная",dxyВес:0.8,сессии:["Торонто","Лондон","Нью-Йорк"]},
+            {пара:"NZD/USD",тип:"товарная",dxyВес:-0.7,сессии:["Веллингтон","Лондон","Нью-Йорк"]},
+            {пара:"USD/CHF",тип:"мажор",dxyВес:0.82,сессии:["Лондон","Нью-Йорк"]},
+            {пара:"GBP/JPY",тип:"кросс",dxyВес:0.05,сессии:["Лондон","Нью-Йорк"]},
+            {пара:"EUR/GBP",тип:"кросс",dxyВес:-0.15,сессии:["Лондон"]},
+            {пара:"XAU/USD",тип:"металл",dxyВес:-0.6,сессии:["Лондон","Нью-Йорк"]}
+        ];
+        
+        const КИЛЛ_ЗОНЫ = [
+            {название:"Токио",начало:2,конец:5,цвет:"#3b82f6",иконка:"🌏"},
+            {название:"Лондон",начало:10,конец:14,цвет:"#10b981",иконка:"🏰",премиум:true},
+            {название:"Нью-Йорк",начало:16,конец:22,цвет:"#f59e0b",иконка:"🗽",премиум:true}
+        ];
+        
+        // ═══════════════════════════════════════════════════════════════════════════════
+        // ГЕНЕРАЦИЯ ДАННЫХ (безопасная)
+        // ═══════════════════════════════════════════════════════════════════════════════
+        
+        function генерацияСвечей(базоваяЦена, количество = 100) {
+            if (!базоваяЦена || isNaN(базоваяЦена)) базоваяЦена = 1.0;
+            const свечи = [];
+            let цена = базоваяЦена;
+            
+            for (let i = 0; i < количество; i++) {
+                const время = Math.floor(Date.now() / 1000) - (количество - i) * 3600;
+                const изменение = (Math.random() - 0.5) * 0.002 * цена;
+                const открытие = цена;
+                цена += изменение;
+                const закрытие = цена;
+                const максимум = Math.max(открытие, закрытие) * (1 + Math.random() * 0.001);
+                const минимум = Math.min(открытие, закрытие) * (1 - Math.random() * 0.001);
                 
                 свечи.push({
-                    time:время,
-                    open:открытие,
-                    high:Math.max(открытие,закрытие)+теньВерх,
-                    low:Math.min(открытие,закрытие)-теньНиз,
-                    close:закрытие,
-                    volume:Math.floor(Math.random()*1000+500)
+                    time: время,
+                    open: открытие,
+                    high: максимум,
+                    low: минимум,
+                    close: закрытие,
+                    volume: Math.floor(Math.random() * 1000 + 100)
                 });
             }
             return свечи;
         }
-
-        function генерацияПрофиляОбъема(свечи){
-            const профиль={};
-            const шаг=(Math.max(...свечи.map(с=>с.high))-Math.min(...свечи.map(с=>с.low)))/24;
-            
-            свечи.forEach(свеча=>{
-                for(let цена=свеча.low;цена<=свеча.high;цена+=шаг){
-                    const уровень=Math.floor(цена/шаг)*шаг;
-                    профиль[уровень]=(профиль[уровень]||0)+свеча.volume;
-                }
-            });
-            
-            const сортированный=Object.entries(профиль).sort((a,b)=>b[1]-a[1]);
-            return{
-                poc:parseFloat(сортированный[0][0]),
-                диапазонЗначимости:сортированный.slice(0,3).map(([цена,объем])=>({цена:parseFloat(цена),объем})),
-                профиль
-            };
-        }
-
+        
         // ═══════════════════════════════════════════════════════════════════════════════
-        // ICT/SMC/ВАЙКОФФ АНАЛИЗ
+        // API (с обработкой ошибок)
         // ═══════════════════════════════════════════════════════════════════════════════
         
-        function поискFVG(свечи){
-            const fvg=[];
-            for(let i=2;i<свечи.length;i++){
-                const с1=свечи[i-2],с2=свечи[i-1],с3=свечи[i];
+        async function загрузитьДанные(пара) {
+            try {
+                const [база, котировка] = пара.split('/');
+                const url = `https://api.exchangerate-api.com/v4/latest/${база}`;
                 
-                if(с1.high<с3.low){
-                    fvg.push({
-                        тип:"бычий",
-                        верх:с3.low,
-                        низ:с1.high,
-                        це:(с3.low+с1.high)/2,
-                        индекс:i,
-                        заполнен:false,
-                        размер:с3.low-с1.high
-                    });
-                }
-                else if(с1.low>с3.high){
-                    fvg.push({
-                        тип:"медвежий",
-                        верх:с1.low,
-                        низ:с3.high,
-                        це:(с1.low+с3.high)/2,
-                        индекс:i,
-                        заполнен:false,
-                        размер:с1.low-с3.high
-                    });
-                }
-            }
-            return fvg.filter(f=>!f.заполнен).slice(-5);
-        }
-
-        function поискОБ(свечи){
-            const блоки=[];
-            for(let i=свечи.length-3;i>=Math.max(0,свечи.length-15);i--){
-                const с=свечи[i];
-                const след=свечи[i+1];
-                const импульс=Math.abs(след.close-след.open);
-                const диапазон=Math.abs(с.close-с.open);
+                const ответ = await fetch(url, { cache: 'no-cache' });
+                if (!ответ.ok) throw new Error('API недоступен');
                 
-                if(с.close<с.open&&след.close>след.open&&импульс>диапазон*1.2){
-                    блоки.push({
-                        тип:"бычий",
-                        open:с.open,
-                        close:с.close,
-                        high:с.high,
-                        low:с.low,
-                        индекс:i,
-                        сила:Math.min(100,Math.round(импульс/диапазон*40)),
-                        пробит:свечи.slice(i+1).some(св=>св.low<с.low)
-                    });
-                }
-                else if(с.close>с.open&&след.close<след.open&&импульс>диапазон*1.2){
-                    блоки.push({
-                        тип:"медвежий",
-                        open:с.open,
-                        close:с.close,
-                        high:с.high,
-                        low:с.low,
-                        индекс:i,
-                        сила:Math.min(100,Math.round(импульс/диапазон*40)),
-                        пробит:свечи.slice(i+1).some(св=>св.high>с.high)
-                    });
-                }
-            }
-            return блоки.slice(0,3);
-        }
-
-        function определитьФазуВайкоффа(свечи,текущаяЦена){
-            const макс20=Math.max(...свечи.slice(-20).map(с=>с.high));
-            const мин20=Math.min(...свечи.slice(-20).map(с=>с.low));
-            const диапазон=макс20-мин20;
-            const позиция=(текущаяЦена-мин20)/диапазон;
-            
-            const объемы=свечи.slice(-10).map(с=>с.volume);
-            const средОбъем=объемы.reduce((a,b)=>a+b,0)/объемы.length;
-            const последнийОбъем=свечи[свечи.length-1].volume;
-            
-            // Определение фазы
-            if(позиция<0.15&&последнийОбъем>средОбъем*1.3)return{фаза:"A",событие:"SC",описание:"Selling Climax - Панические продажи",направление:"накопление"};
-            if(позиция>0.85&&последнийОбъем>средОбъем*1.3)return{фаза:"A",событие:"BC",описание:"Buying Climax - Панические покупки",направление:"распределение"};
-            if(позиция>=0.15&&позиция<=0.4&&последнийОбъем<средОбъем*0.8)return{фаза:"B",событие:"Накопление",описание:"Тихое поглощение позиций",направление:"накопление"};
-            if(позиция>=0.6&&позиция<=0.85&&последнийОбъем<средОбъем*0.8)return{фаза:"B",событие:"Распределение",описание:"Тихая разгрузка позиций",направление:"распределение"};
-            if(позиция<0.1)return{фаза:"C",событие:"Spring",описание:"Ложный пробой минимума",направление:"накопление"};
-            if(позиция>0.9)return{фаза:"C",событие:"UTAD",описание:"Ложный пробой максимума",направление:"распределение"};
-            if(позиция>0.4&&позиция<0.6&&последнийОбъем>средОбъем)return{фаза:"D",событие:"SOS/SOW",описание:"Сигнал силы/слабости",направление:"нейтрально"};
-            
-            return{фаза:"B",событие:"Консолидация",описание:"Накопление причины",направление:"ожидание"};
-        }
-
-        function расчетДисбаланса(свечи){
-            const покупки=свечи.slice(-5).filter(с=>с.close>с.open).reduce((a,с)=>a+с.volume,0);
-            const продажи=свечи.slice(-5).filter(с=>с.close<с.open).reduce((a,с)=>a+с.volume,0);
-            const соотношение=покупки/(продажи||1);
-            return{
-                соотношение:соотношение.toFixed(2),
-                дисбаланс:соотношение>1.5?"бычий":соотношение<0.67?"медвежий":"нейтральный",
-                сила:Math.min(100,Math.abs(соотношение-1)*50)
-            };
-        }
-
-        // ═══════════════════════════════════════════════════════════════════════════════
-        // API И ЗАГРУЗКА ДАННЫХ
-        // ═══════════════════════════════════════════════════════════════════════════════
-        
-        async function загрузитьДанныеПары(пара){
-            try{
-                const [база,котировка]=пара.split('/');
+                const данные = await ответ.json();
+                const цена = данные?.rates?.[котировка];
                 
-                // Пробуем несколько API
-                const источники=[
-                    `https://api.exchangerate-api.com/v4/latest/${база}`,
-                    `https://open.er-api.com/v6/latest/${база}`,
-                    `https://api.frankfurter.app/latest?from=${база}&to=${котировка}`
-                ];
+                if (!цена || isNaN(цена)) throw new Error('Некорректная цена');
                 
-                let данные=null;
-                for(const url of источники){
-                    try{
-                        const ответ=await fetch(url,{cache:'no-cache'});
-                        if(ответ.ok){
-                            данные=await ответ.json();
-                            if(данные.rates&&данные.rates[котировка])break;
-                        }
-                    }catch(e){continue;}
-                }
-                
-                if(!данные||!данные.rates||!данные.rates[котировка]){
-                    throw new Error('API недоступны');
-                }
-                
-                const цена=данные.rates[котировка];
-                const isJPY=пара.includes('JPY');
-                const волатильность=isJPY?0.002:0.001;
-                const свечи=генерацияСвечей(цена,200,"1h",волатильность);
-                
-                // Расчёт DXY
-                let dxy=null;
-                if(пара.includes('USD')){
-                    try{
-                        const dxyResp=await fetch('https://api.exchangerate-api.com/v4/latest/USD');
-                        const dxyData=await dxyResp.json();
-                        const корзина={EUR:0.576,JPY:0.136,GBP:0.119,CAD:0.091,SEK:0.042,CHF:0.036};
-                        dxy=Object.entries(корзина).reduce((acc,[валюта,вес])=>{
-                            return acc+(dxyData.rates[валюта]?1/dxyData.rates[валюта]*вес*50:0);
-                        },0);
-                    }catch(e){dxy=103.5;}
-                }
-                
-                return{
-                    цена,
-                    свечи,
-                    dxy:dxy||103.5,
-                    источник:данные.source||'API',
-                    время:new Date().toISOString(),
-                    демо:false
+                return {
+                    цена: Number(цена),
+                    свечи: генерацияСвечей(Number(цена), 100),
+                    dxy: 103.5,
+                    источник: 'API',
+                    время: new Date().toISOString()
                 };
-                
-            }catch(ошибка){
-                // Fallback с реалистичными данными
-                const демоЦены={"EUR/USD":1.0850,"GBP/USD":1.2750,"USD/JPY":151.80,"AUD/USD":0.6580,"USD/CAD":1.3580,"NZD/USD":0.5980,"USD/CHF":0.9050,"GBP/JPY":193.50,"EUR/GBP":0.8520,"AUD/JPY":99.90,"EUR/JPY":164.50,"XAU/USD":2034.50};
-                const цена=демоЦены[пара]||1.0;
-                const isJPY=пара.includes('JPY');
-                return{
-                    цена,
-                    свечи:генерацияСвечей(цена,200,"1h",isJPY?0.002:0.001),
-                    dxy:103.5,
-                    источник:'демо-данные',
-                    время:new Date().toISOString(),
-                    демо:true
+            } catch (e) {
+                // Fallback
+                const демоЦены = {
+                    "EUR/USD": 1.0850, "GBP/USD": 1.2750, "USD/JPY": 151.80,
+                    "AUD/USD": 0.6580, "USD/CAD": 1.3580, "NZD/USD": 0.5980,
+                    "USD/CHF": 0.9050, "GBP/JPY": 193.50, "EUR/GBP": 0.8520,
+                    "XAU/USD": 2034.50
+                };
+                const цена = демоЦены[пара] || 1.0;
+                return {
+                    цена: цена,
+                    свечи: генерацияСвечей(цена, 100),
+                    dxy: 103.5,
+                    источник: 'демо',
+                    время: new Date().toISOString(),
+                    демо: true
                 };
             }
         }
-
+        
         // ═══════════════════════════════════════════════════════════════════════════════
-        // КОМПОНЕНТЫ ИНТЕРФЕЙСА (ПОЛНОСТЬЮ НА РУССКОМ)
+        // АНАЛИЗ (с проверками)
         // ═══════════════════════════════════════════════════════════════════════════════
         
-        function Шапка({время,дата,сессия}){
-            return(
-                <div className="glass" style={{position:"sticky",top:0,zIndex:100,padding:"20px 24px",borderBottom:"1px solid rgba(255,255,255,0.08)"}}>
-                    <div style={{maxWidth:"1600px",margin:"0 auto",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-                        <div style={{display:"flex",alignItems:"center",gap:16}}>
-                            <div style={{width:48,height:48,borderRadius:12,background:"linear-gradient(135deg,#00d4aa,#00a8e8)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:24,boxShadow:"0 0 20px rgba(0,212,170,0.4)"}}>◈</div>
-                            <div>
-                                <div style={{fontSize:20,fontWeight:800,letterSpacing:"0.5px"}}>
-                                    <span className="gradient-text">FX SCANNER PRO</span>
-                                    <span style={{marginLeft:12,fontSize:10,color:"#00d4aa",border:"1px solid rgba(0,212,170,0.4)",borderRadius:6,padding:"2px 8px"}}>v7.0</span>
-                                </div>
-                                <div style={{fontSize:11,color:"#6b7280",letterSpacing:2,marginTop:2}}>ICT · SMC · WYCKOFF · ИНСТИТУЦИОНАЛЬНЫЙ</div>
-                            </div>
-                        </div>
-                        
-                        <div style={{display:"flex",alignItems:"center",gap:24}}>
-                            {сессия&&(
-                                <div style={{display:"flex",alignItems:"center",gap:10,padding:"10px 20px",background:`${сессия.цвет}15`,border:`1px solid ${сессия.цвет}40`,borderRadius:12}}>
-                                    <span style={{fontSize:20}}>{сессия.иконка}</span>
-                                    <div>
-                                        <div style={{fontSize:11,color:сессия.цвет,fontWeight:700}}>{сессия.название.toUpperCase()}</div>
-                                        <div style={{fontSize:9,color:"#6b7280"}}>{сессия.описание}</div>
-                                    </div>
-                                    <div className="killzone-pulse" style={{width:8,height:8,borderRadius:"50%",background:сессия.цвет}}/>
-                                </div>
-                            )}
-                            <div style={{textAlign:"right"}}>
-                                <div style={{fontSize:24,fontWeight:700,color:"#fff",fontFamily:"monospace",letterSpacing:1}}>{время}</div>
-                                <div style={{fontSize:11,color:"#6b7280"}}>{дата}</div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            );
-        }
-
-        function ПанельСессий({текущийЧас}){
-            return(
-                <div style={{marginBottom:24}}>
-                    <div style={{fontSize:12,color:"#6b7280",letterSpacing:2,marginBottom:12,fontWeight:600}}>ТОРГОВЫЕ СЕССИИ (KILL ZONES)</div>
-                    <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:12}}>
-                        {КИЛЛ_ЗОНЫ.map(сессия=>{
-                            const активна=текущийЧас>=сессия.начало&&текущийЧас<сессия.конец;
-                            const доНачала=сессия.начало>текущийЧас?сессия.начало-текущийЧас:24-текущийЧас+сессия.начало;
-                            
-                            return(
-                                <div key={сессия.название} style={{
-                                    padding:16,
-                                    borderRadius:12,
-                                    background:активна?`linear-gradient(135deg,${сессия.цвет}20,${сессия.цвет}05)`:"rgba(255,255,255,0.03)",
-                                    border:`1px solid ${активна?сессия.цвет:"rgba(255,255,255,0.08)"}`,
-                                    position:"relative",
-                                    overflow:"hidden"
-                                }}>
-                                    {активна&&<div className="shimmer-bg" style={{position:"absolute",inset:0,opacity:0.1}}/>}
-                                    <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
-                                        <span style={{fontSize:24}}>{сессия.иконка}</span>
-                                        {активна&&<div className="killzone-pulse" style={{width:6,height:6,borderRadius:"50%",background:сессия.цвет}}/>}
-                                    </div>
-                                    <div style={{fontSize:14,fontWeight:700,color:активна?сессия.цвет:"#9ca3af"}}>{сессия.название}</div>
-                                    <div style={{fontSize:11,color:"#6b7280",marginTop:4}}>{сессия.начало}:00-{сессия.конец}:00 МСК</div>
-                                    {сессия.премиум&&<div style={{marginTop:8,fontSize:9,color:"#f59e0b",fontWeight:600}}>★ ПРЕМИУМ ЗОНА</div>}
-                                    {!активна&&<div style={{marginTop:8,fontSize:10,color:"#4b5563"}}>Через {доНачала}ч</div>}
-                                </div>
-                            );
-                        })}
-                    </div>
-                </div>
-            );
-        }
-
-        function СелекторПары({пары,выбранная,наВыбор,корреляции}){
-            return(
-                <div style={{marginBottom:24}}>
-                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
-                        <div style={{fontSize:12,color:"#6b7280",letterSpacing:2,fontWeight:600}}>ВЫБОР ВАЛЮТНОЙ ПАРЫ</div>
-                        <div style={{fontSize:11,color:"#4b5563"}}>Найдено: {пары.length}</div>
-                    </div>
-                    <div style={{display:"grid",gridTemplateColumns:"repeat(6,1fr)",gap:10}}>
-                        {пары.map(п=>{
-                            const выбрана=п.пара===выбранная.пара;
-                            const корр=корреляции[п.пара];
-                            const высокаяКорр=корр&&Math.abs(корр)>0.8;
-                            
-                            return(
-                                <div key={п.пара} onClick={()=>наВыбор(п)}
-                                    style={{
-                                        padding:14,
-                                        borderRadius:12,
-                                        cursor:"pointer",
-                                        background:выбрана?"linear-gradient(135deg,rgba(0,212,170,0.2),rgba(0,212,170,0.05))":"rgba(255,255,255,0.03)",
-                                        border:`1px solid ${выбрана?"#00d4aa":высокаяКорр?"rgba(245,158,11,0.5)":"rgba(255,255,255,0.08)"}`,
-                                        transform:выбрана?"scale(1.02)":"scale(1)",
-                                        transition:"all 0.2s ease",
-                                        position:"relative"
-                                    }}>
-                                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
-                                        <span style={{fontSize:13,fontWeight:700,color:выбрана?"#00d4aa":"#e5e7eb"}}>{п.пара}</span>
-                                        {высокаяКорр&&<span style={{fontSize:10,color:"#f59e0b"}}>🔗 {корр.toFixed(2)}</span>}
-                                    </div>
-                                    <div style={{fontSize:10,color:"#6b7280",textTransform:"uppercase"}}>{п.тип}</div>
-                                    <div style={{marginTop:8,display:"flex",gap:4,flexWrap:"wrap"}}>
-                                        <span style={{fontSize:8,padding:"2px 6px",background:"rgba(255,255,255,0.05)",borderRadius:4,color:"#4b5563"}}>{п.волатильность}</span>
-                                        <span style={{fontSize:8,padding:"2px 6px",background:"rgba(255,255,255,0.05)",borderRadius:4,color:"#4b5563"}}>спред {п.спред}</span>
-                                    </div>
-                                    {выбрана&&<div style={{position:"absolute",top:0,right:0,width:3,height:"100%",background:"#00d4aa"}}/>}
-                                </div>
-                            );
-                        })}
-                    </div>
-                </div>
-            );
-        }
-
-        function ГрафикСИндикаторами({свечи,анализ,выбраннаяПара}){
-            const refГрафика=useRef(null);
-            const chartRef=useRef(null);
+        function выполнитьАнализ(данные, пара) {
+            if (!данные || !данные.свечи || данные.свечи.length === 0) {
+                return null;
+            }
             
-            useEffect(()=>{
-                if(!refГрафика.current||!свечи.length)return;
+            const свечи = данные.свечи;
+            const текущаяЦена = безопасноеЧисло(данные.цена, 1.0);
+            const isJPY = пара.includes("JPY");
+            const знаки = isJPY ? 3 : 5;
+            
+            // Безопасный расчёт уровней
+            const ценыЗакрытия = свечи.map(с => безопасноеЧисло(с.close, 0));
+            const макс20 = Math.max(...ценыЗакрытия.slice(-20).filter(c => c > 0)) || текущаяЦена * 1.01;
+            const мин20 = Math.min(...ценыЗакрытия.slice(-20).filter(c => c > 0)) || текущаяЦена * 0.99;
+            const диапазон = макс20 - мин20 || текущаяЦена * 0.02;
+            const середина = (макс20 + мин20) / 2;
+            
+            // Premium/Discount
+            const позиция = (текущаяЦена - мин20) / диапазон;
+            const зона = позиция > 0.8 ? "премиум" : позиция < 0.2 ? "дискаунт" : "равновесие";
+            
+            // ATR (безопасно)
+            const atr = свечи.slice(-14).reduce((acc, с, i, arr) => {
+                if (i === 0) return acc;
+                const предыдущая = arr[i-1];
+                const tr = Math.max(
+                    безопасноеЧисло(с.high, 0) - безопасноеЧисло(с.low, 0),
+                    Math.abs(безопасноеЧисло(с.high, 0) - безопасноеЧисло(предыдущая.close, 0)),
+                    Math.abs(безопасноеЧисло(с.low, 0) - безопасноеЧисло(предыдущая.close, 0))
+                );
+                return acc + tr;
+            }, 0) / 14 || текущаяЦена * 0.001;
+            
+            // Сетапы
+            const сетапПокупка = (зона === "дискаунт" || зона === "равновесие") ? {
+                валиден: true,
+                зонаВхода: `${безопасныйToFixed(мин20, знаки)} - ${безопасныйToFixed(мин20 + atr * 0.3, знаки)}`,
+                стопЛосс: безопасныйToFixed(мин20 - atr * 1.5, знаки),
+                тп1: безопасныйToFixed(текущаяЦена + atr * 2.5, знаки),
+                тп2: безопасныйToFixed(текущаяЦена + atr * 4, знаки),
+                рр1: "2.5",
+                рр2: "4.0",
+                логика: `Цена в зоне ${зона === "дискаунт" ? "дискаунта" : "равновесия"} (${(позиция * 100).toFixed(0)}%). Ожидается отскок.`,
+                концепция: "ICT Premium/Discount",
+                atr: безопасныйToFixed(atr, isJPY ? 2 : 4)
+            } : null;
+            
+            const сетапПродажа = (зона === "премиум" || зона === "равновесие") ? {
+                валиден: true,
+                зонаВхода: `${безопасныйToFixed(макс20 - atr * 0.3, знаки)} - ${безопасныйToFixed(макс20, знаки)}`,
+                стопЛосс: безопасныйToFixed(макс20 + atr * 1.5, знаки),
+                тп1: безопасныйToFixed(текущаяЦена - atr * 2.5, знаки),
+                тп2: безопасныйToFixed(текущаяЦена - atr * 4, знаки),
+                рр1: "2.5",
+                рр2: "4.0",
+                логика: `Цена в зоне ${зона === "премиум" ? "премиума" : "равновесия"} (${(позиция * 100).toFixed(0)}%). Ожидается отскок.`,
+                концепция: "ICT Premium/Discount",
+                atr: безопасныйToFixed(atr, isJPY ? 2 : 4)
+            } : null;
+            
+            return {
+                текущаяЦена,
+                зона,
+                позиция,
+                макс20,
+                мин20,
+                середина,
+                atr,
+                сетапПокупка,
+                сетапПродажа,
+                приоритет: зона === "дискаунт" ? "покупка" : зона === "премиум" ? "продажа" : null
+            };
+        }
+        
+        // ═══════════════════════════════════════════════════════════════════════════════
+        // КОМПОНЕНТЫ
+        // ═══════════════════════════════════════════════════════════════════════════════
+        
+        function График({свечи, уровни}) {
+            const refГрафика = useRef(null);
+            const chartRef = useRef(null);
+            
+            useEffect(() => {
+                if (!refГрафика.current || !свечи || свечи.length === 0) return;
                 
-                if(chartRef.current){
-                    chartRef.current.remove();
-                    chartRef.current=null;
-                }
-                
-                const chart=createChart(refГрафика.current,{
-                    layout:{
-                        background:{type:ColorType.Solid,color:"transparent"},
-                        textColor:"#9ca3af"
-                    },
-                    grid:{
-                        vertLines:{color:"rgba(255,255,255,0.03)"},
-                        horzLines:{color:"rgba(255,255,255,0.03)"}
-                    },
-                    crosshair:{
-                        mode:1,
-                        vertLine:{color:"rgba(0,212,170,0.5)",width:1},
-                        horzLine:{color:"rgba(0,212,170,0.5)",width:1}
-                    },
-                    rightPriceScale:{
-                        borderColor:"rgba(255,255,255,0.1)",
-                        scaleMargins:{top:0.1,bottom:0.1}
-                    },
-                    timeScale:{
-                        borderColor:"rgba(255,255,255,0.1)",
-                        timeVisible:true,
-                        secondsVisible:false
-                    },
-                    height:450
-                });
-                
-                chartRef.current=chart;
-                
-                // Свечи
-                const series=chart.addCandlestickSeries({
-                    upColor:"#10b981",downColor:"#ef4444",
-                    borderUpColor:"#10b981",borderDownColor:"#ef4444",
-                    wickUpColor:"#10b981",wickDownColor:"#ef4444"
-                });
-                series.setData(свечи);
-                
-                // Уровни поддержки/сопротивления
-                if(анализ?.уровни){
-                    анализ.уровни.forEach(ур=>{
-                        const line=chart.addLineSeries({
-                            color:ур.цвет,
-                            lineWidth:ур.толщина||2,
-                            lineStyle:ур.стиль||0,
-                            title:ур.название,
-                            lastValueVisible:false
+                try {
+                    // Очистка предыдущего графика
+                    if (chartRef.current) {
+                        chartRef.current.remove();
+                        chartRef.current = null;
+                    }
+                    
+                    const chart = createChart(refГрафика.current, {
+                        layout: {
+                            background: { type: ColorType.Solid, color: "transparent" },
+                            textColor: "#9ca3af"
+                        },
+                        grid: {
+                            vertLines: { color: "rgba(255,255,255,0.03)" },
+                            horzLines: { color: "rgba(255,255,255,0.03)" }
+                        },
+                        crosshair: { mode: 1 },
+                        rightPriceScale: { borderColor: "rgba(255,255,255,0.1)" },
+                        timeScale: { borderColor: "rgba(255,255,255,0.1)" },
+                        height: 400
+                    });
+                    
+                    chartRef.current = chart;
+                    
+                    const series = chart.addCandlestickSeries({
+                        upColor: "#10b981", downColor: "#ef4444",
+                        borderUpColor: "#10b981", borderDownColor: "#ef4444",
+                        wickUpColor: "#10b981", wickDownColor: "#ef4444"
+                    });
+                    
+                    // Безопасная установка данных
+                    const валидныеСвечи = свечи.filter(с => 
+                        с && typeof с.time === 'number' && 
+                        typeof с.open === 'number' && 
+                        typeof с.high === 'number' && 
+                        typeof с.low === 'number' && 
+                        typeof с.close === 'number'
+                    );
+                    
+                    if (валидныеСвечи.length > 0) {
+                        series.setData(валидныеСвечи);
+                    }
+                    
+                    // Уровни (безопасно)
+                    if (уровни && Array.isArray(уровни)) {
+                        уровни.forEach(ур => {
+                            if (!ур || typeof ур.цена !== 'number') return;
+                            const line = chart.addLineSeries({
+                                color: ур.цвет || "#9ca3af",
+                                lineWidth: 2,
+                                lastValueVisible: false
+                            });
+                            const данныеЛинии = валидныеСвечи.map(с => ({
+                                time: с.time,
+                                value: ур.цена
+                            }));
+                            line.setData(данныеЛинии);
                         });
-                        line.setData(свечи.map(с=>({time:с.time,value:ур.цена})));
-                    });
+                    }
+                    
+                    chart.timeScale().fitContent();
+                    
+                } catch (e) {
+                    console.error('Ошибка графика:', e);
                 }
                 
-                // FVG зоны
-                if(анализ?.fvg){
-                    анализ.fvg.forEach((f,i)=>{
-                        const цвет=f.тип==="бычий"?"rgba(16,185,129,0.2)":"rgba(239,68,68,0.2)";
-                        const верх=chart.addLineSeries({color:цвет,lineWidth:1,lineStyle:2,lastValueVisible:false});
-                        const низ=chart.addLineSeries({color:цвет,lineWidth:1,lineStyle:2,lastValueVisible:false});
-                        верх.setData(свечи.slice(f.индекс-2,f.индекс+10).map(с=>({time:с.time,value:f.верх})));
-                        низ.setData(свечи.slice(f.индекс-2,f.индекс+10).map(с=>({time:с.time,value:f.низ})));
-                    });
-                }
-                
-                // Order Blocks
-                if(анализ?.блокиОрдеров){
-                    анализ.блокиОрдеров.forEach(б=>{
-                        if(!б.пробит){
-                            const цвет=б.тип==="бычий"?"rgba(16,185,129,0.3)":"rgba(239,68,68,0.3)";
-                            const line=chart.addLineSeries({color:цвет,lineWidth:2,lastValueVisible:false});
-                            line.setData(свечи.slice(б.индекс,б.индекс+15).map(с=>({time:с.time,value:б.close})));
+                return () => {
+                    if (chartRef.current) {
+                        try {
+                            chartRef.current.remove();
+                        } catch (e) {
+                            console.error('Ошибка очистки графика:', e);
                         }
-                    });
-                }
-                
-                // Объём
-                const volumeSeries=chart.addHistogramSeries({
-                    color:"#3b82f6",
-                    priceFormat:{type:"volume"},
-                    priceScaleId:""
-                });
-                volumeSeries.setData(свечи.map(с=>({time:с.time,value:с.volume,color:с.close>с.open?"rgba(16,185,129,0.5)":"rgba(239,68,68,0.5)"})));
-                
-                chart.timeScale().fitContent();
-                
-                return()=>{if(chartRef.current){chartRef.current.remove();chartRef.current=null;}};
-            },[свечи,анализ]);
+                        chartRef.current = null;
+                    }
+                };
+            }, [свечи, уровни]);
             
-            return(
-                <div style={{marginBottom:24}}>
-                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
-                        <div style={{fontSize:12,color:"#6b7280",letterSpacing:2,fontWeight:600}}>ЦЕНОВОЙ ГРАФИК · H1 · С ИНДИКАТОРАМИ</div>
-                        <div style={{display:"flex",gap:12,fontSize:11}}>
-                            <span style={{color:"#10b981"}}>● FVG</span>
-                            <span style={{color:"#3b82f6"}}>● ОБ</span>
-                            <span style={{color:"#f59e0b"}}>● Уровни</span>
-                        </div>
-                    </div>
-                    <div ref={refГрафика} className="glass neon-border" style={{borderRadius:16,padding:12}}/>
-                </div>
-            );
+            return <div ref={refГрафика} className="glass" style={{borderRadius:12,padding:12,height:400}}/>;
         }
-
-        function ПанельТехническогоАнализа({анализ}){
-            if(!анализ)return null;
+        
+        function КарточкаСетапа({сетап, тип, приоритет}) {
+            if (!сетап || !сетап.валиден) return null;
             
-            return(
-                <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:16,marginBottom:24}}>
-                    <div className="glass" style={{padding:20,borderRadius:12,borderLeft:`3px solid ${анализ.цветТренда}`}}>
-                        <div style={{fontSize:11,color:"#6b7280",letterSpacing:1,marginBottom:8}}>ТРЕНД (EMA 50/200)</div>
-                        <div style={{fontSize:18,fontWeight:800,color:анализ.цветТренда}}>{анализ.тренд.toUpperCase()}</div>
-                        <div style={{fontSize:12,color:"#9ca3af",marginTop:4}}>Сила: {анализ.силаТренда}%</div>
-                        <div style={{marginTop:12,height:4,background:"rgba(255,255,255,0.05)",borderRadius:2,overflow:"hidden"}}>
-                            <div style={{height:"100%",width:`${анализ.силаТренда}%`,background:анализ.цветТренда,borderRadius:2}}/>
-                        </div>
-                    </div>
-                    
-                    <div className="glass" style={{padding:20,borderRadius:12,borderLeft:"3px solid #8b5cf6"}}>
-                        <div style={{fontSize:11,color:"#6b7280",letterSpacing:1,marginBottom:8}}>RSI (14)</div>
-                        <div style={{fontSize:18,fontWeight:800,color:анализ.rsi>70?"#ef4444":анализ.rsi<30?"#10b981":"#e5e7eb"}}>{анализ.rsi.toFixed(1)}</div>
-                        <div style={{fontSize:12,color:"#9ca3af",marginTop:4}}>
-                            {анализ.rsi>70?"Перекупленность":анализ.rsi<30?"Перепроданность":"Нейтрально"}
-                        </div>
-                    </div>
-                    
-                    <div className="glass" style={{padding:20,borderRadius:12,borderLeft:"3px solid #3b82f6"}}>
-                        <div style={{fontSize:11,color:"#6b7280",letterSpacing:1,marginBottom:8}}>MACD</div>
-                        <div style={{fontSize:18,fontWeight:800,color:анализ.macd.histogram>0?"#10b981":"#ef4444"}}>
-                            {анализ.macd.histogram>0?"БЫЧИЙ":"МЕДВЕЖИЙ"}
-                        </div>
-                        <div style={{fontSize:12,color:"#9ca3af",marginTop:4}}>Гистограмма: {анализ.macd.histogram.toFixed(4)}</div>
-                    </div>
-                    
-                    <div className="glass" style={{padding:20,borderRadius:12,borderLeft:"3px solid #f59e0b"}}>
-                        <div style={{fontSize:11,color:"#6b7280",letterSpacing:1,marginBottom:8}}>ВОЛАТИЛЬНОСТЬ (ATR)</div>
-                        <div style={{fontSize:18,fontWeight:800,color:"#f59e0b"}}>{анализ.atr}</div>
-                        <div style={{fontSize:12,color:"#9ca3af",marginTop:4}}>14 периодов</div>
-                    </div>
-                </div>
-            );
-        }
-
-        function ПанельВайкоффа({фаза}){
-            if(!фаза)return null;
+            const цвет = тип === "покупка" ? "#10b981" : "#ef4444";
+            const isBuy = тип === "покупка";
             
-            const фазаИнфо=WYCKOFF_ФАЗЫ.find(f=>f.код===фаза.фаза)||WYCKOFF_ФАЗЫ[1];
-            
-            return(
-                <div className="glass" style={{padding:24,borderRadius:16,marginBottom:24,border:`1px solid ${фазаИнфо.цвет}40`}}>
-                    <div style={{display:"flex",alignItems:"center",gap:16,marginBottom:16}}>
-                        <div style={{width:60,height:60,borderRadius:16,background:`${фазаИнфо.цвет}20`,border:`2px solid ${фазаИнфо.цвет}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:28}}>
-                            {фаза.направление==="накопление"?"📥":"📤"}
-                        </div>
-                        <div>
-                            <div style={{fontSize:11,color:"#6b7280",letterSpacing:2}}>АНАЛИЗ ВАЙКОФФА</div>
-                            <div style={{fontSize:22,fontWeight:800,color:фазаИнфо.цвет,marginTop:4}}>{фаза.событие}</div>
-                            <div style={{fontSize:13,color:"#9ca3af",marginTop:2}}>{фаза.описание}</div>
-                        </div>
-                        <div style={{marginLeft:"auto",textAlign:"right"}}>
-                            <div style={{fontSize:11,color:"#6b7280"}}>ФАЗА</div>
-                            <div style={{fontSize:32,fontWeight:800,color:фазаИнфо.цвет}}>{фаза.фаза}</div>
-                        </div>
-                    </div>
-                    
-                    <div style={{display:"flex",gap:8}}>
-                        {WYCKOFF_ФАЗЫ.map(f=>(
-                            <div key={f.код} style={{
-                                flex:1,
-                                padding:12,
-                                borderRadius:8,
-                                background:f.код===фаза.фаза?`${f.цвет}20`:"rgba(255,255,255,0.03)",
-                                border:`1px solid ${f.код===фаза.фаза?f.цвет:"transparent"}`,
-                                textAlign:"center",
-                                opacity:f.код===фаза.фаза?1:0.5
-                            }}>
-                                <div style={{fontSize:16,fontWeight:700,color:f.цвет}}>{f.код}</div>
-                                <div style={{fontSize:9,color:"#6b7280",marginTop:4}}>{f.название}</div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            );
-        }
-
-        function ПанельДисбаланса({дисбаланс}){
-            if(!дисбаланс)return null;
-            
-            const цвет=дисбаланс.дисбаланс==="бычий"?"#10b981":дисбаланс.дисбаланс==="медвежий"?"#ef4444":"#9ca3af";
-            const градиент=дисбаланс.дисбаланс==="бычий"?"linear-gradient(90deg,#10b981,#059669)":дисбаланс.дисбаланс==="медвежий"?"linear-gradient(90deg,#ef4444,#dc2626)":"linear-gradient(90deg,#6b7280,#4b5563)";
-            
-            return(
-                <div className="glass" style={{padding:20,borderRadius:12,marginBottom:24}}>
-                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
-                        <div style={{fontSize:12,color:"#6b7280",letterSpacing:2}}>ДИСБАЛАНС ОРДЕРОВ (5 ПЕРИОДОВ)</div>
-                        <div style={{fontSize:11,color:цвет,fontWeight:700}}>{дисбаланс.дисбаланс.toUpperCase()}</div>
-                    </div>
-                    
-                    <div style={{display:"flex",alignItems:"center",gap:20}}>
-                        <div style={{flex:1}}>
-                            <div style={{height:40,background:"rgba(239,68,68,0.2)",borderRadius:8,position:"relative",overflow:"hidden"}}>
-                                <div style={{
-                                    position:"absolute",
-                                    right:0,
-                                    top:0,
-                                    bottom:0,
-                                    width:`${дисбаланс.дисбаланс==="бычий"?дисбаланс.сила:0}%`,
-                                    background:"rgba(16,185,129,0.4)",
-                                    borderRadius:"0 8px 8px 0",
-                                    transition:"all 0.5s"
-                                }}/>
-                                <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,fontWeight:700,color:"#fff"}}>
-                                    Соотношение: {дисбаланс.соотношение}
-                                </div>
-                            </div>
-                            <div style={{display:"flex",justifyContent:"space-between",marginTop:8,fontSize:10,color:"#6b7280"}}>
-                                <span>Продажи</span>
-                                <span>Покупки</span>
-                            </div>
-                        </div>
-                        
-                        <div style={{width:80,textAlign:"center"}}>
-                            <div style={{fontSize:28,fontWeight:800,color:цвет}}>{дисбаланс.сила}%</div>
-                            <div style={{fontSize:10,color:"#6b7280"}}>СИЛА</div>
-                        </div>
-                    </div>
-                </div>
-            );
-        }
-
-        function КарточкаСетапа({сетап,тип,уверенность,приоритет,профиль}){
-            if(!сетап||!сетап.валиден)return null;
-            
-            const цвет=тип==="покупка"?"#10b981":"#ef4444";
-            const акцент=тип==="покупка"?"#00d4aa":"#f87171";
-            const градиент=тип==="покупка"?"linear-gradient(135deg,rgba(16,185,129,0.15),rgba(16,185,129,0.05))":"linear-gradient(135deg,rgba(239,68,68,0.15),rgba(239,68,68,0.05))";
-            
-            return(
-                <div style={{
-                    padding:28,
-                    borderRadius:20,
-                    background:градиент,
-                    border:`2px solid ${приоритет?акцент:"rgba(255,255,255,0.1)"}`,
-                    boxShadow:приоритет?`0 0 40px ${акцент}30`:"none",
-                    position:"relative",
-                    overflow:"hidden"
+            return (
+                <div className="glass" style={{
+                    padding: 24,
+                    borderRadius: 16,
+                    border: `2px solid ${приоритет ? цвет : "rgba(255,255,255,0.1)"}`,
+                    background: приоритет ? `${цвет}10` : "transparent"
                 }}>
-                    {приоритет&&(
-                        <div style={{position:"absolute",top:0,right:0,padding:"8px 16px",background:акцент,borderRadius:"0 0 0 12px",fontSize:11,fontWeight:700,color:"#fff"}}>
+                    {приоритет && (
+                        <div style={{marginBottom: 12, padding: "4px 12px", background: цвет, borderRadius: 6, display: "inline-block", fontSize: 11, fontWeight: 700, color: "#fff"}}>
                             ★ РЕКОМЕНДУЕТСЯ
                         </div>
                     )}
                     
-                    <div style={{display:"flex",alignItems:"center",gap:16,marginBottom:24}}>
-                        <div style={{
-                            width:64,height:64,borderRadius:16,
-                            background:`${акцент}20`,
-                            border:`2px solid ${акцент}`,
-                            display:"flex",alignItems:"center",justifyContent:"center",
-                            fontSize:32
-                        }}>
-                            {тип==="покупка"?"🚀":"🔻"}
-                        </div>
+                    <div style={{display: "flex", alignItems: "center", gap: 12, marginBottom: 20}}>
+                        <div style={{fontSize: 32}}>{isBuy ? "🚀" : "🔻"}</div>
                         <div>
-                            <div style={{fontSize:24,fontWeight:800,color:акцент,letterSpacing:1}}>
-                                {тип==="покупка"?"LONG":"SHORT"} SETUP
+                            <div style={{fontSize: 20, fontWeight: 800, color: цвет}}>
+                                {isBuy ? "LONG" : "SHORT"} SETUP
                             </div>
-                            <div style={{fontSize:13,color:"#9ca3af",marginTop:4}}>{сетап.концепция}</div>
-                        </div>
-                        <div style={{marginLeft:"auto",textAlign:"right"}}>
-                            <div style={{fontSize:36,fontWeight:800,color:уверенность>75?акцент:"#9ca3af"}}>{уверенность}%</div>
-                            <div style={{fontSize:10,color:"#6b7280",letterSpacing:1}}>УВЕРЕННОСТЬ</div>
+                            <div style={{fontSize: 12, color: "#6b7280"}}>{сетап.концепция}</div>
                         </div>
                     </div>
                     
-                    <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:12,marginBottom:24}}>
-                        {[
-                            {метка:"ЗОНА ВХОДА (LIMIT)",значение:сетап.зонаВхода,цвет:"#f59e0b"},
-                            {метка:"СТОП-ЛОСС",значение:сетап.стопЛосс,цвет:"#ef4444"},
-                            {метка:"ТЕЙК-ПРОФИТ 1",значение:сетап.тп1,цвет:"#10b981",подпись:`R:R ${сетап.рр1}:1`},
-                            {метка:"ТЕЙК-ПРОФИТ 2",значение:сетап.тп2,цвет:"#10b981",подпись:`R:R ${сетап.рр2}:1`}
-                        ].map((поле,i)=>(
-                            <div key={i} className="glass" style={{padding:16,borderRadius:12,borderLeft:`3px solid ${поле.цвет}`}}>
-                                <div style={{fontSize:10,color:"#6b7280",letterSpacing:1,marginBottom:4}}>{поле.метка}</div>
-                                <div style={{fontSize:18,fontWeight:700,color:поле.цвет}}>{поле.значение}</div>
-                                {поле.подпись&&<div style={{fontSize:11,color:"#4b5563",marginTop:2}}>{поле.подпись}</div>}
-                            </div>
-                        ))}
-                    </div>
-                    
-                    <div className="glass" style={{padding:20,borderRadius:12,marginBottom:16}}>
-                        <div style={{fontSize:11,color:"#6b7280",letterSpacing:1,marginBottom:12}}>ЛОГИКА ВХОДА</div>
-                        <div style={{fontSize:14,color:"#e5e7eb",lineHeight:1.7}}>{сетап.логика}</div>
-                        
-                        {сетап.блокОрдеров&&!сетап.блокОрдеров.пробит&&(
-                            <div style={{marginTop:12,padding:12,background:"rgba(59,130,246,0.1)",borderRadius:8,borderLeft:"3px solid #3b82f6"}}>
-                                <div style={{fontSize:11,color:"#3b82f6",fontWeight:600}}>📦 ORDER BLOCK</div>
-                                <div style={{fontSize:12,color:"#9ca3af",marginTop:4}}>
-                                    {сетап.блокОрдеров.тип} @ {сетап.блокОрдеров.close.toFixed(5)} · Сила: {сетап.блокОрдеров.сила}%
-                                </div>
-                            </div>
-                        )}
-                        
-                        {сетап.fvg&&(
-                            <div style={{marginTop:12,padding:12,background:"rgba(245,158,11,0.1)",borderRadius:8,borderLeft:"3px solid #f59e0b"}}>
-                                <div style={{fontSize:11,color:"#f59e0b",fontWeight:600}}>⚡ FAIR VALUE GAP</div>
-                                <div style={{fontSize:12,color:"#9ca3af",marginTop:4}}>
-                                    50% CE: {сетап.fvg.це.toFixed(5)} · Размер: {(сетап.fvg.размер*10000).toFixed(1)}п
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                    
-                    {профиль&&(
-                        <div style={{display:"flex",gap:8,fontSize:10}}>
-                            <span style={{padding:"6px 12px",background:"rgba(255,255,255,0.05)",borderRadius:6,color:"#6b7280"}}>
-                                POC: {профиль.poc.toFixed(5)}
-                            </span>
-                            <span style={{padding:"6px 12px",background:"rgba(255,255,255,0.05)",borderRadius:6,color:"#6b7280"}}>
-                                ATR: {сетап.atr}
-                            </span>
-                            <span style={{padding:"6px 12px",background:"rgba(255,255,255,0.05)",borderRadius:6,color:"#6b7280"}}>
-                                {сетап.времяСделки}
-                            </span>
+                    <div style={{display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16}}>
+                        <div className="glass" style={{padding: 12, borderRadius: 8}}>
+                            <div style={{fontSize: 10, color: "#6b7280", marginBottom: 4}}>ЗОНА ВХОДА</div>
+                            <div style={{fontSize: 16, fontWeight: 700, color: "#f59e0b"}}>{сетап.зонаВхода}</div>
                         </div>
-                    )}
-                </div>
-            );
-        }
-
-        function МатрицаКорреляции({корреляции,выбранная}){
-            const пары=Object.keys(корреляции).filter(к=>к!==выбранная.пара).slice(0,8);
-            
-            return(
-                <div className="glass" style={{padding:24,borderRadius:16,marginBottom:24}}>
-                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
-                        <div style={{fontSize:12,color:"#6b7280",letterSpacing:2}}>КОРРЕЛЯЦИЯ С ДРУГИМИ ПАРАМИ</div>
-                        <div style={{fontSize:11,color:"#4b5563"}}>Период: 20</div>
+                        <div className="glass" style={{padding: 12, borderRadius: 8}}>
+                            <div style={{fontSize: 10, color: "#6b7280", marginBottom: 4}}>STOP LOSS</div>
+                            <div style={{fontSize: 16, fontWeight: 700, color: "#ef4444"}}>{сетап.стопЛосс}</div>
+                        </div>
+                        <div className="glass" style={{padding: 12, borderRadius: 8}}>
+                            <div style={{fontSize: 10, color: "#6b7280", marginBottom: 4}}>TP1 (R:R {сетап.рр1})</div>
+                            <div style={{fontSize: 16, fontWeight: 700, color: "#10b981"}}>{сетап.тп1}</div>
+                        </div>
+                        <div className="glass" style={{padding: 12, borderRadius: 8}}>
+                            <div style={{fontSize: 10, color: "#6b7280", marginBottom: 4}}>TP2 (R:R {сетап.рр2})</div>
+                            <div style={{fontSize: 16, fontWeight: 700, color: "#10b981"}}>{сетап.тп2}</div>
+                        </div>
                     </div>
                     
-                    <div style={{display:"flex",flexDirection:"column",gap:10}}>
-                        {пары.map(пара=>{
-                            const знач=корреляции[пара];
-                            const цвет=Math.abs(знач)>0.8?"#ef4444":Math.abs(знач)>0.5?"#f59e0b":"#10b981";
-                            const ширина=Math.abs(знач)*100;
-                            
-                            return(
-                                <div key={пара} style={{display:"flex",alignItems:"center",gap:12}}>
-                                    <div style={{width:80,fontSize:12,color:"#9ca3af"}}>{пара}</div>
-                                    <div style={{flex:1,height:8,background:"rgba(255,255,255,0.05)",borderRadius:4,overflow:"hidden"}}>
-                                        <div style={{
-                                            height:"100%",
-                                            width:`${ширина}%`,
-                                            background:цвет,
-                                            borderRadius:4,
-                                            marginLeft:знач<0?`calc(50% - ${ширина/2}%)`:"50%",
-                                            transform:знач<0?`translateX(-100%)`:"none"
-                                        }}/>
-                                    </div>
-                                    <div style={{width:50,textAlign:"right",fontSize:12,fontWeight:700,color:цвет}}>
-                                        {знач>0?"+":""}{знач.toFixed(2)}
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
-                    
-                    <div style={{marginTop:16,display:"flex",gap:20,fontSize:10,color:"#4b5563"}}>
-                        <span style={{color:"#10b981"}}>● Низкая (0-0.5)</span>
-                        <span style={{color:"#f59e0b"}}>● Средняя (0.5-0.8)</span>
-                        <span style={{color:"#ef4444"}}>● Высокая (0.8+)</span>
+                    <div className="glass" style={{padding: 12, borderRadius: 8}}>
+                        <div style={{fontSize: 11, color: "#6b7280", marginBottom: 4}}>ЛОГИКА</div>
+                        <div style={{fontSize: 13, color: "#e5e7eb", lineHeight: 1.6}}>{сетап.логика}</div>
                     </div>
                 </div>
             );
         }
-
-        function ЭкономическийКалендарь({текущийЧас}){
-            const события=useMemo(()=>{
-                return ЭКОНОМИЧЕСКИЕ_СОБЫТИЯ.map(с=>{
-                    const час=parseInt(с.время);
-                    const до=час>текущийЧас?час-текущийЧас:24-текущийЧас+час;
-                    return{...с,часовДо:до};
-                }).sort((a,b)=>a.часовДо-b.часовДо).slice(0,4);
-            },[текущийЧас]);
-            
-            return(
-                <div className="glass" style={{padding:24,borderRadius:16,marginBottom:24}}>
-                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
-                        <div style={{fontSize:12,color:"#6b7280",letterSpacing:2}}>ЭКОНОМИЧЕСКИЙ КАЛЕНДАРЬ</div>
-                        <div style={{fontSize:11,color:"#4b5563"}}>Ближайшие события</div>
-                    </div>
-                    
-                    <div style={{display:"flex",flexDirection:"column",gap:12}}>
-                        {события.map((с,i)=>{
-                            const цвет=с.важность==="высокая"?"#ef4444":с.важность==="средняя"?"#f59e0b":"#10b981";
-                            const критично=с.часовДо<2&&с.важность==="высокая";
-                            
-                            return(
-                                <div key={i} style={{
-                                    display:"flex",alignItems:"center",gap:16,
-                                    padding:16,borderRadius:12,
-                                    background:критично?"rgba(239,68,68,0.1)":"rgba(255,255,255,0.03)",
-                                    border:`1px solid ${критично?"rgba(239,68,68,0.3)":"transparent"}`
-                                }}>
-                                    <div style={{width:60,textAlign:"center"}}>
-                                        <div style={{fontSize:18,fontWeight:700,color:"#e5e7eb"}}>{с.время}</div>
-                                        <div style={{fontSize:9,color:"#6b7280"}}>UTC</div>
-                                    </div>
-                                    <div style={{flex:1}}>
-                                        <div style={{fontSize:14,color:"#e5e7eb",fontWeight:600}}>{с.название}</div>
-                                        <div style={{display:"flex",gap:8,marginTop:6}}>
-                                            <span style={{fontSize:10,padding:"2px 8px",background:"rgba(255,255,255,0.05)",borderRadius:4,color:"#9ca3af"}}>{с.валюта}</span>
-                                            <span style={{fontSize:10,padding:"2px 8px",background:`${цвет}20`,borderRadius:4,color}}>{с.важность.toUpperCase()}</span>
-                                        </div>
-                                    </div>
-                                    <div style={{textAlign:"right"}}>
-                                        <div style={{fontSize:16,fontWeight:700,color:цвет}}>{с.часовДо}ч</div>
-                                        {критично&&<div style={{fontSize:9,color:"#ef4444",marginTop:2}}>⚠ ОСТАНОВИТЬ ТОРГОВЛЮ</div>}
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
-                </div>
-            );
-        }
-
+        
         // ═══════════════════════════════════════════════════════════════════════════════
         // ГЛАВНЫЙ КОМПОНЕНТ
         // ═══════════════════════════════════════════════════════════════════════════════
         
-        function Приложение(){
-            const [выбраннаяПара,setВыбраннаяПара]=useState(ВАЛЮТНЫЕ_ПАРЫ[0]);
-            const [загрузка,setЗагрузка]=useState(false);
-            const [данные,setДанные]=useState(null);
-            const [анализ,setАнализ]=useState(null);
-            const [корреляции,setКорреляции]=useState({});
-            const [время,setВремя]=useState(получитьВремяМосква());
-            const [дата,setДата]=useState(получитьДатуМосква());
-            const [час,setЧас]=useState(получитьЧасМосква());
+        function Приложение() {
+            const [выбраннаяПара, setВыбраннаяПара] = useState(ВАЛЮТНЫЕ_ПАРЫ[0]);
+            const [загрузка, setЗагрузка] = useState(false);
+            const [данные, setДанные] = useState(null);
+            const [анализ, setАнализ] = useState(null);
+            const [время, setВремя] = useState(получитьВремяМосква());
+            const [час, setЧас] = useState(получитьЧасМосква());
+            const [ошибка, setОшибка] = useState(null);
             
-            useEffect(()=>{
-                const таймер=setInterval(()=>{
+            useEffect(() => {
+                const таймер = setInterval(() => {
                     setВремя(получитьВремяМосква());
-                    setДата(получитьДатуМосква());
                     setЧас(получитьЧасМосква());
-                },1000);
-                return()=>clearInterval(таймер);
-            },[]);
+                }, 1000);
+                return () => clearInterval(таймер);
+            }, []);
             
-            useEffect(()=>{
-                if(!данные?.свечи)return;
-                
-                // Расчёт корреляций с другими парами
-                const текущиеЦены=данные.свечи.map(с=>с.close);
-                const новыеКорр={};
-                
-                ВАЛЮТНЫЕ_ПАРЫ.forEach(п=>{
-                    if(п.пара!==выбраннаяПара.пара){
-                        // Симуляция корреляции на основе DXY веса
-                        const базоваяКорр=1-Math.abs(п.dxyВес-выбраннаяПара.dxyВес);
-                        const шум=(Math.random()-0.5)*0.3;
-                        новыеКорр[п.пара]=Math.max(-1,Math.min(1,базоваяКорр+шум));
-                    }
-                });
-                
-                setКорреляции(новыеКорр);
-            },[данные,выбраннаяПара]);
-            
-            const выполнитьАнализ=async()=>{
+            const выполнитьСкан = useCallback(async () => {
                 setЗагрузка(true);
+                setОшибка(null);
                 
-                try{
-                    const данныеПары=await загрузитьДанныеПары(выбраннаяПара.пара);
+                try {
+                    const данныеПары = await загрузитьДанные(выбраннаяПара.пара);
                     setДанные(данныеПары);
                     
-                    const свечи=данныеПары.свечи;
-                    const цены=свечи.map(с=>с.close);
-                    const текущаяЦена=данныеПары.цена;
-                    const isJPY=выбраннаяПара.пара.includes("JPY");
-                    const знаки=isJPY?3:5;
-                    
-                    // Технические индикаторы
-                    const rsi=расчетRSI(цены);
-                    const macd=расчетMACD(цены);
-                    const боллинджер=расчетБоллинджера(цены);
-                    const atr=свечи.slice(-14).reduce((acc,с,i,arr)=>{
-                        if(i===0)return acc;
-                        return acc+Math.max(с.high-с.low,Math.abs(с.high-arr[i-1].close),Math.abs(с.low-arr[i-1].close));
-                    },0)/14;
-                    
-                    // Определение тренда
-                    const ema50=цены.slice(-50).reduce((a,b)=>a+b,0)/50;
-                    const ema200=цены.slice(-200).reduce((a,b)=>a+b,0)/200;
-                    const тренд=текущаяЦена>ema50&&ema50>ema200?"восходящий":текущаяЦена<ema50&&ema50<ema200?"нисходящий":"боковой";
-                    const силаТренда=Math.min(100,Math.round(Math.abs(текущаяЦена-ema200)/ema200*5000));
-                    const цветТренда=тренд==="восходящий"?"#10b981":тренд==="нисходящий"?"#ef4444":"#9ca3af";
-                    
-                    // Уровни
-                    const макс20=Math.max(...свечи.slice(-20).map(с=>с.high));
-                    const мин20=Math.min(...свечи.slice(-20).map(с=>с.low));
-                    const диапазон=макс20-мин20;
-                    const середина=(макс20+мин20)/2;
-                    
-                    // Premium/Discount
-                    const позиция=(текущаяЦена-мин20)/диапазон;
-                    const зона=позиция>0.8?"премиум":позиция<0.2?"дискаунт":"равновесие";
-                    
-                    // ICT элементы
-                    const fvg=поискFVG(свечи);
-                    const блокиОрдеров=поискОБ(свечи);
-                    const фазаВайкоффа=определитьФазуВайкоффа(свечи,текущаяЦена);
-                    const дисбаланс=расчетДисбаланса(свечи);
-                    const профиль=генерацияПрофиляОбъема(свечи);
-                    
-                    // Сетапы
-                    const сетапПокупка=(зона==="дискаунт"||зона==="равновесие")?{
-                        валиден:true,
-                        зонаВхода:`${мин20.toFixed(знаки)}-${(мин20+atr*0.5).toFixed(знаки)}`,
-                        стопЛосс:(мин20-atr*1.5).toFixed(знаки),
-                        тп1:(текущаяЦена+atr*2.5).toFixed(знаки),
-                        тп2:(текущаяЦена+atr*4).toFixed(знаки),
-                        рр1:2.5,рр2:4.0,
-                        логика:`Цена в зоне дискаунта (${(позиция*100).toFixed(0)}%). Конфлюэнс с ${блокиОрдеров.find(б=>б.тип==="бычий"&&!б.пробит)?"Order Block":"FVG 50% CE"}.`,
-                        концепция:блокиОрдеров.find(б=>б.тип==="бычий"&&!б.пробит)?"Order Block + FVG":"FVG Consequent Encroachment",
-                        блокОрдеров:блокиОрдеров.find(б=>б.тип==="бычий"&&!б.пробит),
-                        fvg:fvg.find(f=>f.тип==="бычий"),
-                        atr:atr.toFixed(isJPY?2:4),
-                        времяСделки:"Лондон/Нью-Йорк Kill Zone"
-                    }:null;
-                    
-                    const сетапПродажа=(зона==="премиум"||зона==="равновесие")?{
-                        валиден:true,
-                        зонаВхода:`${(макс20-atr*0.5).toFixed(знаки)}-${макс20.toFixed(знаки)}`,
-                        стопЛосс:(макс20+atr*1.5).toFixed(знаки),
-                        тп1:(текущаяЦена-atr*2.5).toFixed(знаки),
-                        тп2:(текущаяЦена-atr*4).toFixed(знаки),
-                        рр1:2.5,рр2:4.0,
-                        логика:`Цена в зоне премиума (${(позиция*100).toFixed(0)}%). Конфлюэнс с ${блокиОрдеров.find(б=>б.тип==="медвежий"&&!б.пробит)?"Order Block":"FVG 50% CE"}.`,
-                        концепция:блокиОрдеров.find(б=>б.тип==="медвежий"&&!б.пробит)?"Order Block + FVG":"FVG Consequent Encroachment",
-                        блокОрдеров:блокиОрдеров.find(б=>б.тип==="медвежий"&&!б.пробит),
-                        fvg:fvg.find(f=>f.тип==="медвежий"),
-                        atr:atr.toFixed(isJPY?2:4),
-                        времяСделки:"Лондон/Нью-Йорк Kill Zone"
-                    }:null;
-                    
-                    // Приоритет
-                    let приоритет=null;
-                    if(сетапПокупка?.валиден&&сетапПродажа?.валиден){
-                        приоритет=зона==="дискаунт"?"покупка":зона==="премиум"?"продажа":null;
-                    }else if(сетапПокупка?.валиден){
-                        приоритет="покупка";
-                    }else if(сетапПродажа?.валиден){
-                        приоритет="продажа";
-                    }
-                    
-                    setАнализ({
-                        тренд,силаТренда,цветТренда,rsi,macd,atr:atr.toFixed(isJPY?2:4),
-                        зона,позиция,
-                        уровни:[
-                            {цена:макс20,название:"Сопротивление 20",цвет:"#ef4444",толщина:2,стиль:2},
-                            {цена:боллинджер.верх,название:"BB Верх",цвет:"#f59e0b",толщина:1,стиль:3},
-                            {цена:середина,название:"Средняя линия",цвет:"#9ca3af",толщина:1,стиль:3},
-                            {цена:боллинджер.низ,название:"BB Низ",цвет:"#f59e0b",толщина:1,стиль:3},
-                            {цена:мин20,название:"Поддержка 20",цвет:"#10b981",толщина:2,стиль:2},
-                            {цена:профиль.poc,название:"POC",цвет:"#8b5cf6",толщина:2,стиль:0}
-                        ],
-                        fvg,блокиОрдеров,фазаВайкоффа,дисбаланс,профиль,
-                        сетапПокупка,сетапПродажа,приоритет
-                    });
-                    
-                }finally{
+                    const результатАнализа = выполнитьАнализ(данныеПары, выбраннаяПара.пара);
+                    setАнализ(результатАнализа);
+                } catch (e) {
+                    console.error('Ошибка сканирования:', e);
+                    setОшибка(e.message);
+                } finally {
                     setЗагрузка(false);
                 }
-            };
+            }, [выбраннаяПара]);
             
-            const активнаяСессия=КИЛЛ_ЗОНЫ.find(с=>час>=с.начало&&час<с.конец)||null;
+            const активнаяСессия = КИЛЛ_ЗОНЫ.find(с => час >= с.начало && час < с.конец) || null;
             
-            return(
-                <div style={{minHeight:"100vh",background:"linear-gradient(180deg,#0a0c10 0%,#111827 100%)"}}>
-                    <Шапка время={время} дата={дата} сессия={активнаяСессия}/>
+            return (
+                <div style={{minHeight: "100vh", background: "linear-gradient(180deg,#0a0c10,#111827)"}}>
+                    {/* Шапка */}
+                    <div className="glass" style={{position: "sticky", top: 0, zIndex: 100, padding: "20px 24px"}}>
+                        <div style={{maxWidth: "1400px", margin: "0 auto", display: "flex", justifyContent: "space-between", alignItems: "center"}}>
+                            <div>
+                                <div style={{fontSize: 24, fontWeight: 800}}>
+                                    <span className="gradient-text">FX SCANNER PRO</span>
+                                    <span style={{marginLeft: 12, fontSize: 12, color: "#00d4aa", border: "1px solid rgba(0,212,170,0.4)", borderRadius: 6, padding: "2px 8px"}}>v7.1</span>
+                                </div>
+                                <div style={{fontSize: 11, color: "#6b7280", marginTop: 4}}>ICT · SMC · БЕЗОПАСНЫЙ АНАЛИЗ</div>
+                            </div>
+                            <div style={{textAlign: "right"}}>
+                                <div style={{fontSize: 24, fontWeight: 700, color: "#fff", fontFamily: "monospace"}}>{время}</div>
+                                <div style={{fontSize: 11, color: "#6b7280"}}>Москва (UTC+3)</div>
+                            </div>
+                        </div>
+                    </div>
                     
-                    <div style={{maxWidth:"1600px",margin:"0 auto",padding:"28px"}}>
-                        <ПанельСессий текущийЧас={час}/>
+                    <div style={{maxWidth: "1400px", margin: "0 auto", padding: "24px"}}>
+                        {/* Сессии */}
+                        <div style={{display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12, marginBottom: 24}}>
+                            {КИЛЛ_ЗОНЫ.map(сессия => {
+                                const активна = час >= сессия.начало && час < сессия.конец;
+                                return (
+                                    <div key={сессия.название} className="glass" style={{
+                                        padding: 16,
+                                        borderRadius: 12,
+                                        border: `1px solid ${активна ? сессия.цвет : "transparent"}`,
+                                        background: активна ? `${сессия.цвет}15` : undefined
+                                    }}>
+                                        <div style={{display: "flex", alignItems: "center", gap: 8, marginBottom: 8}}>
+                                            <span style={{fontSize: 24}}>{сессия.иконка}</span>
+                                            {активна && <div className="killzone-pulse" style={{width: 8, height: 8, borderRadius: "50%", background: сессия.цвет}}/>}
+                                        </div>
+                                        <div style={{fontSize: 16, fontWeight: 700, color: активна ? сессия.цвет : "#9ca3af"}}>{сессия.название}</div>
+                                        <div style={{fontSize: 12, color: "#6b7280"}}>{сессия.начало}:00 - {сессия.конец}:00 МСК</div>
+                                    </div>
+                                );
+                            })}
+                        </div>
                         
-                        <СелекторПары 
-                            пары={ВАЛЮТНЫЕ_ПАРЫ} 
-                            выбранная={выбраннаяПара} 
-                            наВыбор={setВыбраннаяПара}
-                            корреляции={корреляции}
-                        />
+                        {/* Выбор пары */}
+                        <div style={{marginBottom: 24}}>
+                            <div style={{fontSize: 12, color: "#6b7280", marginBottom: 12}}>ВЫБЕРИТЕ ВАЛЮТНУЮ ПАРУ</div>
+                            <div style={{display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 10}}>
+                                {ВАЛЮТНЫЕ_ПАРЫ.map(п => {
+                                    const выбрана = п.пара === выбраннаяПара.пара;
+                                    return (
+                                        <div 
+                                            key={п.пара} 
+                                            onClick={() => { setВыбраннаяПара(п); setДанные(null); setАнализ(null); }}
+                                            className="glass"
+                                            style={{
+                                                padding: 14,
+                                                borderRadius: 12,
+                                                cursor: "pointer",
+                                                border: `1px solid ${выбрана ? "#00d4aa" : "transparent"}`,
+                                                background: выбрана ? "rgba(0,212,170,0.1)" : undefined
+                                            }}
+                                        >
+                                            <div style={{fontSize: 14, fontWeight: 700, color: выбрана ? "#00d4aa" : "#e5e7eb"}}>{п.пара}</div>
+                                            <div style={{fontSize: 11, color: "#6b7280", marginTop: 4}}>{п.тип}</div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
                         
-                        {загрузка&&(
-                            <div style={{textAlign:"center",padding:"80px 20px"}}>
-                                <div style={{position:"relative",width:80,height:80,margin:"0 auto 30px"}}>
-                                    <div style={{position:"absolute",inset:0,border:"4px solid rgba(0,212,170,0.1)",borderRadius:"50%"}}/>
-                                    <div style={{position:"absolute",inset:0,border:"4px solid transparent",borderTopColor:"#00d4aa",borderRadius:"50%",animation:"rotate 1s linear infinite"}}/>
-                                    <div style={{position:"absolute",inset:12,display:"flex",alignItems:"center",justifyContent:"center",fontSize:28}}>◈</div>
+                        {/* Ошибка */}
+                        {ошибка && (
+                            <div className="error-fallback">
+                                <div style={{fontSize: 18, color: "#ef4444", fontWeight: 700, marginBottom: 8}}>Ошибка: {ошибка}</div>
+                                <button onClick={выполнитьСкан} style={{padding: "10px 20px", background: "#22cc88", border: "none", borderRadius: 8, color: "#fff", fontWeight: 700, cursor: "pointer"}}>
+                                    Попробовать снова
+                                </button>
+                            </div>
+                        )}
+                        
+                        {/* Загрузка */}
+                        {загрузка && (
+                            <div style={{textAlign: "center", padding: 60}}>
+                                <div style={{width: 60, height: 60, margin: "0 auto 20px", border: "4px solid rgba(0,212,170,0.1)", borderTopColor: "#00d4aa", borderRadius: "50%", animation: "rotate 1s linear infinite"}}/>
+                                <div style={{fontSize: 16, color: "#00d4aa"}}>Анализ рынка...</div>
+                            </div>
+                        )}
+                        
+                        {/* Результаты */}
+                        {данные && анализ && !загрузка && (
+                            <div style={{animation: "slideIn 0.5s ease"}}>
+                                {/* Цена */}
+                                <div className="glass" style={{padding: 24, borderRadius: 16, marginBottom: 24, display: "flex", justifyContent: "space-between", alignItems: "center"}}>
+                                    <div>
+                                        <div style={{fontSize: 42, fontWeight: 800, color: "#fff"}}>
+                                            {безопасныйToFixed(данные.цена, выбраннаяПара.пара.includes("JPY") ? 3 : 5)}
+                                        </div>
+                                        <div style={{fontSize: 13, color: "#6b7280", marginTop: 4}}>
+                                            {выбраннаяПара.пара} · {данные.источник} {данные.демо && "(демо)"}
+                                        </div>
+                                    </div>
+                                    <div style={{textAlign: "right"}}>
+                                        <div style={{padding: "8px 16px", background: "rgba(16,185,129,0.1)", borderRadius: 8, color: "#10b981", fontWeight: 700}}>
+                                            ✓ Данные актуальны
+                                        </div>
+                                        <div style={{fontSize: 12, color: "#6b7280", marginTop: 8}}>
+                                            Зона: <span style={{color: анализ.зона === "премиум" ? "#ef4444" : анализ.зона === "дискаунт" ? "#10b981" : "#f59e0b", fontWeight: 700}}>{анализ.зона.toUpperCase()}</span>
+                                        </div>
+                                    </div>
                                 </div>
-                                <div style={{fontSize:18,color:"#00d4aa",letterSpacing:3,fontWeight:700,marginBottom:16}}>
-                                    ИНСТИТУЦИОНАЛЬНЫЙ АНАЛИЗ
+                                
+                                {/* График */}
+                                <div style={{marginBottom: 24}}>
+                                    <График 
+                                        свечи={данные.свечи} 
+                                        уровни={[
+                                            {цена: анализ.макс20, цвет: "#ef4444"},
+                                            {цена: анализ.середина, цвет: "#9ca3af"},
+                                            {цена: анализ.мин20, цвет: "#10b981"}
+                                        ]} 
+                                    />
                                 </div>
-                                <div style={{display:"flex",gap:10,justifyContent:"center",flexWrap:"wrap"}}>
-                                    {["Wyckoff Phases","Order Blocks","Fair Value Gaps","Volume Profile","Order Flow","Market Structure"].map((т,i)=>(
-                                        <div key={т} style={{
-                                            padding:"10px 20px",
-                                            background:`rgba(0,212,170,${0.1+i*0.02})`,
-                                            borderRadius:20,
-                                            fontSize:12,
-                                            color:"#00d4aa",
-                                            animation:`slideIn ${0.3+i*0.1}s ease`
-                                        }}>{т}</div>
-                                    ))}
+                                
+                                {/* Сетапы */}
+                                <div style={{display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16}}>
+                                    <КарточкаСетапа 
+                                        сетап={анализ.сетапПокупка} 
+                                        тип="покупка" 
+                                        приоритет={анализ.приоритет === "покупка"} 
+                                    />
+                                    <КарточкаСетапа 
+                                        сетап={анализ.сетапПродажа} 
+                                        тип="продажа" 
+                                        приоритет={анализ.приоритет === "продажа"} 
+                                    />
                                 </div>
                             </div>
                         )}
                         
-                        {данные&&!загрузка&&(
-                            <>
-                                <div className="glass neon-border" style={{padding:24,borderRadius:16,marginBottom:24,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                                    <div>
-                                        <div style={{fontSize:42,fontWeight:800,color:"#fff",letterSpacing:"-1px"}}>
-                                            {данные.цена.toFixed(выбраннаяПара.пара.includes("JPY")?3:5)}
-                                        </div>
-                                        <div style={{fontSize:13,color:"#6b7280",marginTop:4}}>
-                                            {выбраннаяПара.пара} · {данные.источник} · Обновлено: {new Date(данные.время).toLocaleTimeString("ru-RU")}
-                                        </div>
-                                    </div>
-                                    <div style={{textAlign:"right"}}>
-                                        <div style={{display:"flex",alignItems:"center",gap:8,justifyContent:"flex-end",marginBottom:8}}>
-                                            <div style={{width:8,height:8,borderRadius:"50%",background:"#10b981"}}/>
-                                            <span style={{fontSize:14,color:"#10b981",fontWeight:700}}>ДАННЫЕ АКТУАЛЬНЫ</span>
-                                        </div>
-                                        <div style={{fontSize:12,color:"#4b5563"}}>DXY: {данные.dxy?.toFixed(2)||"N/A"}</div>
-                                        {данные.демо&&<div style={{fontSize:11,color:"#f59e0b",marginTop:4}}>⚠ Демо-режим</div>}
-                                    </div>
-                                </div>
-                                
-                                <ГрафикСИндикаторами свечи={данные.свечи} анализ={анализ} выбраннаяПара={выбраннаяПара}/>
-                                
-                                <ПанельТехническогоАнализа анализ={анализ}/>
-                                
-                                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:24}}>
-                                    <div>
-                                        <ПанельВайкоффа фаза={анализ?.фазаВайкоффа}/>
-                                        <ПанельДисбаланса дисбаланс={анализ?.дисбаланс}/>
-                                        <МатрицаКорреляции корреляции={корреляции} выбранная={выбраннаяПара}/>
-                                    </div>
-                                    <div>
-                                        <ЭкономическийКалендарь текущийЧас={час}/>
-                                    </div>
-                                </div>
-                                
-                                <div style={{marginTop:24,display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:24}}>
-                                    <КарточкаСетапа 
-                                        сетап={анализ?.сетапПокупка} 
-                                        тип="покупка" 
-                                        уверенность={анализ?.приоритет==="покупка"?90:анализ?.сетапПокупка?65:0}
-                                        приоритет={анализ?.приоритет==="покупка"}
-                                        профиль={анализ?.профиль}
-                                    />
-                                    <КарточкаСетапа 
-                                        сетап={анализ?.сетапПродажа} 
-                                        тип="продажа" 
-                                        уверенность={анализ?.приоритет==="продажа"?90:анализ?.сетапПродажа?65:0}
-                                        приоритет={анализ?.приоритет==="продажа"}
-                                        профиль={анализ?.профиль}
-                                    />
-                                </div>
-                                
-                                {анализ?.приоритет===null&&(
-                                    <div className="glass" style={{padding:40,borderRadius:20,textAlign:"center",border:"2px solid rgba(245,158,11,0.3)",marginTop:24}}>
-                                        <div style={{fontSize:56,marginBottom:16}}>⚠️</div>
-                                        <div style={{fontSize:22,fontWeight:800,color:"#f59e0b",marginBottom:8}}>НЕТ КАЧЕСТВЕННОГО СЕТАПА</div>
-                                        <div style={{fontSize:14,color:"#9ca3af",lineHeight:1.8,maxWidth:600,margin:"0 auto"}}>
-                                            Текущие рыночные условия не соответствуют критериям ICT/SMC.<br/>
-                                            Ожидайте входа цены в Premium/Discount зоны или формирования чёткой структуры.
-                                        </div>
-                                    </div>
-                                )}
-                            </>
-                        )}
-                        
-                        {!данные&&!загрузка&&(
-                            <div style={{textAlign:"center",padding:"120px 20px"}}>
-                                <div style={{fontSize:80,marginBottom:24,opacity:0.2}}>◈</div>
-                                <div style={{fontSize:24,color:"#6b7280",letterSpacing:3,marginBottom:16,fontWeight:700}}>ГОТОВ К АНАЛИЗУ</div>
-                                <div style={{fontSize:15,color:"#9ca3af",lineHeight:2,maxWidth:700,margin:"0 auto"}}>
-                                    Выберите валютную пару и запустите <span style={{color:"#00d4aa",fontWeight:600}}>ИНСТИТУЦИОНАЛЬНЫЙ АНАЛИЗ</span><br/>
-                                    Получите полную картину рынка: Wyckoff фазы, Order Blocks, FVG,<br/>
-                                    Volume Profile, Order Flow и готовые торговые сетапы с точками входа.
-                                </div>
+                        {/* Пустое состояние */}
+                        {!данные && !загрузка && !ошибка && (
+                            <div style={{textAlign: "center", padding: 80}}>
+                                <div style={{fontSize: 64, opacity: 0.2, marginBottom: 20}}>◈</div>
+                                <div style={{fontSize: 18, color: "#6b7280", marginBottom: 8}}>Готов к анализу</div>
+                                <div style={{fontSize: 14, color: "#4b5563"}}>Выберите пару и нажмите кнопку ниже</div>
                             </div>
                         )}
                     </div>
                     
-                    {/* Фиксированная кнопка */}
-                    <div style={{
-                        position:"fixed",bottom:0,left:0,right:0,
-                        background:"rgba(10,12,16,0.95)",backdropFilter:"blur(20px)",
-                        borderTop:"1px solid rgba(255,255,255,0.08)",padding:"24px 28px 32px",
-                        zIndex:1000
-                    }}>
-                        <div style={{maxWidth:"1600px",margin:"0 auto"}}>
+                    {/* Кнопка */}
+                    <div style={{position: "fixed", bottom: 0, left: 0, right: 0, background: "rgba(10,12,16,0.95)", backdropFilter: "blur(20px)", borderTop: "1px solid rgba(255,255,255,0.08)", padding: "20px 24px 28px"}}>
+                        <div style={{maxWidth: "1400px", margin: "0 auto"}}>
                             <button 
-                                onClick={выполнитьАнализ}
+                                onClick={выполнитьСкан}
                                 disabled={загрузка}
                                 style={{
-                                    width:"100%",height:72,
-                                    background:загрузка?"rgba(0,212,170,0.1)":"linear-gradient(135deg,#00d4aa,#00a8e8)",
-                                    border:"none",borderRadius:16,
-                                    color:загрузка?"rgba(0,212,170,0.4)":"#fff",
-                                    fontSize:20,fontWeight:800,letterSpacing:2,
-                                    cursor:загрузка?"not-allowed":"pointer",
-                                    boxShadow:загрузка?"none":"0 12px 40px rgba(0,212,170,0.3)",
-                                    transition:"all 0.3s ease",
-                                    display:"flex",alignItems:"center",justifyContent:"center",gap:16
+                                    width: "100%",
+                                    height: 64,
+                                    background: загрузка ? "rgba(0,212,170,0.1)" : "linear-gradient(135deg,#00d4aa,#00a8e8)",
+                                    border: "none",
+                                    borderRadius: 12,
+                                    color: загрузка ? "rgba(0,212,170,0.4)" : "#fff",
+                                    fontSize: 18,
+                                    fontWeight: 800,
+                                    cursor: загрузка ? "not-allowed" : "pointer",
+                                    boxShadow: загрузка ? "none" : "0 8px 32px rgba(0,212,170,0.3)"
                                 }}
                             >
-                                {загрузка?(
-                                    <>АНАЛИЗ<span className="killzone-pulse">...</span></>
-                                ):(
-                                    <>🔬 ЗАПУСТИТЬ ИНСТИТУЦИОНАЛЬНЫЙ АНАЛИЗ</>
-                                )}
+                                {загрузка ? "АНАЛИЗ..." : "🔬 ЗАПУСТИТЬ АНАЛИЗ"}
                             </button>
-                            <div style={{textAlign:"center",marginTop:16,fontSize:12,color:"#4b5563",letterSpacing:1}}>
-                                Smart Money Concepts · Inner Circle Trader · Wyckoff Method · Volume Profile
-                            </div>
                         </div>
                     </div>
                 </div>
             );
         }
-
-        ReactDOM.createRoot(document.getElementById('root')).render(<Приложение/>);
+        
+        // Рендер с Error Boundary
+        ReactDOM.createRoot(document.getElementById('root')).render(
+            <ErrorBoundary>
+                <Приложение/>
+            </ErrorBoundary>
+        );
     </script>
 </body>
 </html>
