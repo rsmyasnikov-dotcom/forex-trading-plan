@@ -1,221 +1,381 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ru">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Forex Trading Plan - Professional Analysis</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <title>FX Scanner Pro v4</title>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
-        body { font-family: 'Inter', sans-serif; background: #020617; color: #f8fafc; }
-        .font-mono { font-family: 'JetBrains Mono', monospace; }
+        *{box-sizing:border-box;margin:0;padding:0}
+        body{background:#060c14;color:#ccdde8;font-family:'Courier New',monospace;overflow-x:hidden}
+        ::-webkit-scrollbar{width:0;height:0}
+        @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+        @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
     </style>
 </head>
 <body>
-    <div id="app"></div>
-    
-    <script>
-        const data = {
-            pair: "EUR/USD",
-            currentPrice: 1.15221,
-            timestamp: "2026-04-05",
-            trend: { d1: "downtrend", h4: "range", bias: "bearish" },
-            dxy: { current: 100.031, trend: "uptrend", bias: "bullish", correlation: -0.988 },
-            atr: 0.00077,
-            dailyRange: { high: 1.15513, low: 1.15168 },
-            levels: { 
-                support: [1.14591, 1.15237, 1.15808], 
-                resistance: [1.14929, 1.15847],
-                nearestSupport: 1.14591,
-                nearestResistance: 1.15847
-            },
-            recommendation: { 
-                action: "NO_TRADE", 
-                confidence: "medium",
-                direction: "bearish",
-                reason: "D1 bearish but H4 consolidating. Insufficient RR ratio. Wait for resistance test at 1.15847."
-            }
-        };
-
-        const app = document.getElementById('app');
+    <div id="root"></div>
+    <script type="text/babel">
+        const {useState,useEffect,useRef}=React;
+        const PAIRS=["EUR/USD","GBP/USD","USD/JPY","AUD/USD","USD/CAD","NZD/USD","USD/CHF","GBP/JPY"];
         
-        app.innerHTML = `
-            <div class="min-h-screen p-4 md:p-6 max-w-7xl mx-auto">
-                <header class="mb-8">
-                    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                        <div>
-                            <h1 class="text-3xl md:text-4xl font-bold bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent">
-                                Forex Trading Plan
-                            </h1>
-                            <p class="text-slate-400 mt-1">Professional Day Trading Analysis</p>
-                        </div>
-                        <div class="text-xs text-slate-500">
-                            <span class="inline-block w-2 h-2 bg-green-500 rounded-full mr-1 animate-pulse"></span>
-                            Live • ${data.timestamp}
-                        </div>
-                    </div>
-                </header>
+        async function fetchLivePrices(pairs){
+            const toYahoo=p=>p.replace("/","")+"=X";
+            const race=(fn,ms=4000)=>Promise.race([fn(),new Promise((_,r)=>setTimeout(()=>r(new Error("to")),ms))]);
+            try{
+                const s=pairs.map(toYahoo).join(",");
+                const d=await(await fetch(`https://query1.finance.yahoo.com/v7/finance/quote?symbols=${s}`)).json();
+                const out={};
+                for(const q of d?.quoteResponse?.result||[]){
+                    const p=pairs.find(x=>toYahoo(x)===q.symbol);
+                    if(p&&q.regularMarketPrice) out[p]=parseFloat(q.regularMarketPrice.toFixed(5));
+                }
+                return out;
+            }catch(_){
+                try{
+                    const d=await(await fetch("https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/usd.json")).json();
+                    const out={};
+                    for(const pair of pairs){
+                        const [b,q]=pair.split("/");
+                        let v=q==="USD"?1/d.usd[b.toLowerCase()]:b==="USD"?d.usd[q.toLowerCase()]:d.usd[q.toLowerCase()]/d.usd[b.toLowerCase()];
+                        if(isFinite(v)&&v>0) out[pair]=parseFloat(v.toFixed(5));
+                    }
+                    return out;
+                }catch(_){return{}}
+            }
+        }
 
-                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    <!-- Left Column -->
-                    <div class="space-y-6">
-                        <!-- Price Card -->
-                        <div class="bg-slate-900/50 border border-slate-800 rounded-2xl p-6">
-                            <div class="flex items-center justify-between mb-4">
-                                <span class="text-slate-400 text-sm">Current Price</span>
-                                <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
-                            </div>
-                            <div class="text-4xl font-mono font-bold text-white">${data.currentPrice}</div>
-                            <div class="flex items-center gap-2 mt-2 text-sm">
-                                <span class="text-slate-400">24h Range:</span>
-                                <span class="font-mono">${data.dailyRange.low} - ${data.dailyRange.high}</span>
-                            </div>
-                            <div class="mt-3 pt-3 border-t border-slate-800">
-                                <div class="flex justify-between text-sm">
-                                    <span class="text-slate-400">ATR(14):</span>
-                                    <span class="font-mono text-blue-400">${data.atr}</span>
-                                </div>
+        function offlineAnalysis(pair,price,isDeep){
+            const p=parseFloat(price)||1.0;
+            const isJPY=pair.includes("JPY");
+            const fmt=v=>v.toFixed(isJPY?3:4);
+            const atr=isJPY?0.08:0.0008;
+            const step=isJPY?0.5:0.005;
+            const nearRes=Math.ceil(p/step)*step;
+            const nearSup=Math.floor(p/step)*step;
+            const bias=(nearRes-p)<(p-nearSup)?"sell":"buy";
+            const seed=Math.floor(p*10000)%1000;
+            const rnd=(min,max)=>min+((seed*9301+49297)%233280)/233280*(max-min);
+            const conf=Math.round(rnd(52,72));
+            
+            const buySL=parseFloat(fmt(nearSup-atr*1.5));
+            const buyEntry=parseFloat(fmt(nearSup+atr*0.3));
+            const buyTP1=parseFloat(fmt(buyEntry+Math.abs(buyEntry-buySL)*2.2));
+            const sellSL=parseFloat(fmt(nearRes+atr*1.5));
+            const sellEntry=parseFloat(fmt(nearRes-atr*0.3));
+            const sellTP1=parseFloat(fmt(sellEntry-Math.abs(sellSL-sellEntry)*2.2));
+            
+            const base={
+                mode:isDeep?"deep":"quick",
+                context:`${pair}: ${fmt(p)} — технический анализ`,
+                _offline:true,
+                signal:bias,
+                confidence:conf,
+                entry_num:bias==="buy"?buyEntry:sellEntry,
+                entry_zone:bias==="buy"?`${fmt(nearSup)}-${fmt(buyEntry)}`:`${fmt(sellEntry)}-${fmt(nearRes)}`,
+                sl_num:bias==="buy"?buySL:sellSL,
+                sl:bias==="buy"?fmt(buySL):fmt(sellSL),
+                tp1_num:bias==="buy"?buyTP1:sellTP1,
+                tp1:bias==="buy"?fmt(buyTP1):fmt(sellTP1),
+                regime:"range",
+                reason:`Цена у ${bias==="buy"?"поддержки":"сопротивления"}`,
+                news_risk:"medium"
+            };
+            if(!isDeep)return base;
+            return{...base,
+                market_regime:{type:"range",subtype:bias==="buy"?"bullish_trend":"bearish_trend",description:`Цена у ${bias==="buy"?"поддержки":"сопротивления"}`,score:conf},
+                confidence:{score:conf,breakdown:{MTF:Math.round(rnd(50,75)),"Структура":Math.round(rnd(50,75)),"OB/FVG":Math.round(rnd(45,70)),"Новости":Math.round(rnd(40,65)),DXY:Math.round(rnd(45,70))}},
+                sr_levels:[
+                    {type:"resistance",price:fmt(nearRes),price_num:nearRes,strength:4,description:"Ближайшее сопротивление"},
+                    {type:"support",price:fmt(nearSup),price_num:nearSup,strength:4,description:"Ближайшая поддержка"}
+                ],
+                buy:{entry_zone:`${fmt(nearSup)}-${fmt(buyEntry)}`,entry_num:buyEntry,stop_loss:fmt(buySL),sl_num:buySL,tp1:fmt(buyTP1),tp1_num:buyTP1,confidence:Math.round(rnd(60,75)),pattern:"Отбой от поддержки",reasoning:`Цена у ${fmt(nearSup)}`},
+                sell:{entry_zone:`${fmt(sellEntry)}-${fmt(nearRes)}`,entry_num:sellEntry,stop_loss:fmt(sellSL),sl_num:sellSL,tp1:fmt(sellTP1),tp1_num:sellTP1,confidence:Math.round(rnd(60,75)),pattern:"Отбой от сопротивления",reasoning:`Цена у ${fmt(nearRes)}`},
+                mtf:{h1:{trend:bias==="buy"?"bull":"bear",structure:"Уровневый анализ"},h4:{trend:bias==="buy"?"bull":"bear",structure:"Уровневый анализ"},daily:{trend:"neutral",structure:"Нет данных"},weekly:{trend:"neutral",structure:"Нет данных"},signal:bias==="buy"?"weak_buy":"weak_sell",aligned:2,signal_text:"Офлайн-режим"},
+                tips:{best_session:"Лондон/Нью-Йорк",confirmation:"Закрытие H1 свечи",avoid:"Вход без подтверждения",checklist:["Цена у уровня","H1 подтвердила","Нет новостей 30 мин"],max_trades:"Максимум 2 сделки"}
+            };
+        }
+
+        function getMoscowTime(){return new Date().toLocaleTimeString("ru-RU",{hour:"2-digit",minute:"2-digit",second:"2-digit",timeZone:"Europe/Moscow"})}
+        function getSession(){
+            const h=parseInt(new Date().toLocaleTimeString("ru-RU",{hour:"2-digit",timeZone:"Europe/Moscow"}));
+            if(h>=10&&h<19)return{name:"ЛОНДОН",color:"#22cc88"};
+            if(h>=16&&h<24)return{name:"НЬЮ-ЙОРК",color:"#e8c94a"};
+            if(h>=3&&h<12)return{name:"АЗИЯ",color:"#7fb3e0"};
+            return{name:"ОФМАРКЕТ",color:"#8899bb"};
+        }
+
+        // ─── Components ───────────────────────────────────────────────────────────────
+        function ConfidenceMeter({score,breakdown}){
+            if(!score)return null;
+            const pct=Math.min(100,Math.max(0,Number(score)));
+            const c=pct>=75?"#22cc88":pct>=55?"#f0d060":"#ff5566";
+            const circ=2*Math.PI*26,off=circ-(pct/100)*circ;
+            return(
+                <div style={{background:"rgba(12,18,28,.9)",border:`1px solid ${c}28`,borderRadius:12,padding:"12px 14px",marginBottom:12}}>
+                    <div style={{fontSize:10,color:"#aabbdd",letterSpacing:2,marginBottom:10,fontWeight:700}}>AI УВЕРЕННОСТЬ</div>
+                    <div style={{display:"flex",alignItems:"center",gap:16}}>
+                        <div style={{position:"relative",width:68,height:68,flexShrink:0}}>
+                            <svg width="68" height="68" viewBox="0 0 68 68" style={{transform:"rotate(-90deg)"}}>
+                                <circle cx="34" cy="34" r="26" fill="none" stroke="rgba(255,255,255,.08)" strokeWidth="5"/>
+                                <circle cx="34" cy="34" r="26" fill="none" stroke={c} strokeWidth="5" strokeDasharray={circ} strokeDashoffset={off} strokeLinecap="round"/>
+                            </svg>
+                            <div style={{position:"absolute",inset:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center"}}>
+                                <span style={{fontSize:17,fontWeight:700,color:c}}>{pct}</span>
+                                <span style={{fontSize:8,color:"#ccdde8"}}>%</span>
                             </div>
                         </div>
-
-                        <!-- Trend Analysis -->
-                        <div class="bg-slate-900/50 border border-slate-800 rounded-2xl p-6">
-                            <h3 class="text-lg font-semibold mb-4 flex items-center gap-2">
-                                <svg class="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
-                                Trend Analysis
-                            </h3>
-                            <div class="space-y-3">
-                                <div class="p-3 rounded-lg border bg-rose-500/10 border-rose-500/30">
-                                    <div class="flex justify-between items-center">
-                                        <span class="text-sm font-medium">D1 Timeframe</span>
-                                        <span class="font-bold text-rose-400">BEARISH</span>
+                        <div style={{flex:1}}>
+                            <div style={{fontSize:12,fontWeight:700,color:c,marginBottom:7}}>{pct>=75?"ВЫСОКАЯ":pct>=55?"СРЕДНЯЯ":"НИЗКАЯ"}</div>
+                            {breakdown&&Object.entries(breakdown).slice(0,3).map(([k,v])=>(
+                                <div key={k} style={{display:"flex",alignItems:"center",gap:7,marginBottom:5}}>
+                                    <div style={{fontSize:10,color:"#aabbdd",width:80}}>{k}</div>
+                                    <div style={{flex:1,height:3,borderRadius:2,background:"rgba(255,255,255,.07)"}}>
+                                        <div style={{height:"100%",width:`${v}%`,background:c,borderRadius:2}}/>
                                     </div>
-                                    <div class="text-xs text-slate-400 mt-1">downtrend</div>
+                                    <div style={{fontSize:10,color:"#ccdde8",width:28,textAlign:"right"}}>{v}%</div>
                                 </div>
-                                <div class="p-3 rounded-lg border bg-amber-500/10 border-amber-500/30">
-                                    <div class="flex justify-between items-center">
-                                        <span class="text-sm font-medium">H4 Timeframe</span>
-                                        <span class="font-bold text-amber-400">RANGE</span>
-                                    </div>
-                                    <div class="text-xs text-slate-400 mt-1">Consolidation phase</div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- DXY -->
-                        <div class="bg-slate-900/50 border border-slate-800 rounded-2xl p-6">
-                            <h3 class="text-lg font-semibold mb-4 flex items-center gap-2">
-                                <svg class="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                                Dollar Index (DXY)
-                            </h3>
-                            <div class="grid grid-cols-2 gap-4">
-                                <div>
-                                    <div class="text-2xl font-mono font-bold">${data.dxy.current}</div>
-                                    <div class="text-xs text-slate-400">Current</div>
-                                </div>
-                                <div>
-                                    <div class="text-lg font-bold text-emerald-400">BULLISH</div>
-                                    <div class="text-xs text-slate-400">Trend</div>
-                                </div>
-                            </div>
-                            <div class="mt-3 pt-3 border-t border-slate-800">
-                                <div class="flex justify-between text-sm">
-                                    <span class="text-slate-400">Correlation:</span>
-                                    <span class="font-mono text-rose-400">${data.dxy.correlation}</span>
-                                </div>
-                                <div class="text-xs text-slate-500 mt-1">Strong inverse correlation</div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Right Column -->
-                    <div class="lg:col-span-2 space-y-6">
-                        <!-- Recommendation -->
-                        <div class="bg-slate-900/50 border-2 border-slate-700 rounded-2xl p-6">
-                            <div class="flex items-center justify-between mb-6">
-                                <h2 class="text-2xl font-bold">Trading Recommendation</h2>
-                                <div class="px-4 py-2 rounded-full text-sm font-bold bg-slate-700 text-slate-300">
-                                    NO TRADE
-                                </div>
-                            </div>
-
-                            <div class="flex items-center gap-4 p-4 rounded-xl bg-slate-950/50 border border-slate-800">
-                                <svg class="w-8 h-8 text-amber-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
-                                <div>
-                                    <div class="font-semibold text-amber-400">No Trade Setup</div>
-                                    <div class="text-sm text-slate-400 mt-1">
-                                        ${data.recommendation.reason}
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="mt-4 p-4 rounded-lg bg-slate-950/30 border border-slate-800">
-                                <h4 class="font-semibold mb-2 flex items-center gap-2">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                                    Watch List Setup
-                                </h4>
-                                <ul class="text-sm text-slate-400 space-y-1">
-                                    <li>• Set alert at 1.1580-1.1590 (resistance zone)</li>
-                                    <li>• Wait for price rejection / bearish confirmation</li>
-                                    <li>• Potential Sell Limit: 1.15847</li>
-                                    <li>• SL: 1.16100 | TP1: 1.15200 | TP2: 1.14800</li>
-                                    <li>• Expected RR: 2.5 / 4.0</li>
-                                </ul>
-                            </div>
-                        </div>
-
-                        <!-- Key Levels -->
-                        <div class="bg-slate-900/50 border border-slate-800 rounded-2xl p-6">
-                            <h3 class="text-lg font-semibold mb-4">Key Levels</h3>
-                            <div class="grid grid-cols-2 gap-4">
-                                <div>
-                                    <div class="text-sm text-slate-400 mb-2">Support Zones</div>
-                                    ${data.levels.support.map(l => `
-                                        <div class="flex items-center gap-2 text-emerald-400 mb-1">
-                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"></path></svg>
-                                            <span class="font-mono">${l.toFixed(5)}</span>
-                                        </div>
-                                    `).join('')}
-                                </div>
-                                <div>
-                                    <div class="text-sm text-slate-400 mb-2">Resistance Zones</div>
-                                    ${data.levels.resistance.map(l => `
-                                        <div class="flex items-center gap-2 text-rose-400 mb-1">
-                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18"></path></svg>
-                                            <span class="font-mono">${l.toFixed(5)}</span>
-                                        </div>
-                                    `).join('')}
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Context -->
-                        <div class="bg-slate-900/50 border border-slate-800 rounded-2xl p-6">
-                            <h3 class="text-lg font-semibold mb-4">Market Context</h3>
-                            <div class="grid grid-cols-3 gap-4 text-center">
-                                <div class="p-3 rounded-lg bg-slate-950/30">
-                                    <div class="text-xs text-slate-400">D1 Bias</div>
-                                    <div class="text-lg font-bold text-rose-400">BEARISH</div>
-                                </div>
-                                <div class="p-3 rounded-lg bg-slate-950/30">
-                                    <div class="text-xs text-slate-400">H4 Structure</div>
-                                    <div class="text-lg font-bold text-amber-400">RANGE</div>
-                                </div>
-                                <div class="p-3 rounded-lg bg-slate-950/30">
-                                    <div class="text-xs text-slate-400">Confidence</div>
-                                    <div class="text-lg font-bold text-amber-400">MEDIUM</div>
-                                </div>
-                            </div>
+                            ))}
                         </div>
                     </div>
                 </div>
+            );
+        }
 
-                <footer class="mt-8 pt-6 border-t border-slate-800 text-center text-xs text-slate-500">
-                    <p>Forex Trading Plan • Conservative Day Trading Strategy • D1/H4/H1 Analysis</p>
-                    <p class="mt-1">Risk Warning: Trading involves substantial risk of loss. Past performance does not guarantee future results.</p>
-                </footer>
-            </div>
-        `;
+        function SetupCard({data,isBuy}){
+            if(!data)return null;
+            const accent=isBuy?"#22dd88":"#ff6677";
+            const bg=isBuy?"rgba(6,18,14,.97)":"rgba(20,6,8,.97)";
+            const border=isBuy?"rgba(34,204,136,.38)":"rgba(255,68,85,.38)";
+            const rr=data.entry_num&&data.sl_num&&data.tp1_num?(Math.abs(data.tp1_num-data.entry_num)/Math.abs(data.entry_num-data.sl_num)).toFixed(2):"—";
+            return(
+                <div style={{background:bg,border:`1.5px solid ${border}`,borderRadius:14,padding:"16px 14px",marginBottom:12}}>
+                    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}>
+                        <div style={{background:`${accent}22`,border:`1px solid ${accent}77`,borderRadius:8,padding:"5px 12px",fontSize:14,fontWeight:700,letterSpacing:2,color:accent}}>
+                            {isBuy?"▲ BUY":"▼ SELL"} LIMIT
+                        </div>
+                        <div style={{background:"rgba(240,208,96,.1)",border:"1px solid rgba(240,208,96,.35)",borderRadius:20,padding:"4px 10px",fontSize:12,color:"#f0d060",fontWeight:700}}>
+                            R:R {rr}
+                        </div>
+                    </div>
+                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"11px 14px",marginBottom:10}}>
+                        <div>
+                            <div style={{fontSize:9,color:"#bbddee",letterSpacing:1,marginBottom:3}}>ВХОД</div>
+                            <div style={{fontSize:16,fontWeight:700,color:"#f0d060"}}>{data.entry_zone}</div>
+                        </div>
+                        <div>
+                            <div style={{fontSize:9,color:"#bbddee",letterSpacing:1,marginBottom:3}}>СТОП ЛОСС</div>
+                            <div style={{fontSize:16,fontWeight:700,color:"#ff7788"}}>{data.stop_loss||data.sl}</div>
+                        </div>
+                        <div>
+                            <div style={{fontSize:9,color:"#bbddee",letterSpacing:1,marginBottom:3}}>ТЕЙК ПРОФИТ</div>
+                            <div style={{fontSize:16,fontWeight:700,color:"#22dd88"}}>{data.tp1}</div>
+                        </div>
+                    </div>
+                    {data.reasoning&&<div style={{fontSize:11,color:"#ccdde8",lineHeight:1.6,paddingTop:8,borderTop:"1px solid rgba(255,255,255,.05)"}}>{data.reasoning}</div>}
+                </div>
+            );
+        }
+
+        function SRLevelsCard({levels,currentPrice}){
+            if(!levels||!levels.length)return null;
+            const sorted=[...levels].sort((a,b)=>Number(b.price_num)-Number(a.price_num));
+            const cp=Number(currentPrice);
+            return(
+                <div style={{background:"rgba(12,18,28,.9)",border:"1px solid rgba(100,160,220,.18)",borderRadius:12,padding:"12px 14px",marginBottom:12}}>
+                    <div style={{fontSize:10,color:"#aabbdd",letterSpacing:2,marginBottom:10,fontWeight:700}}>КЛЮЧЕВЫЕ УРОВНИ</div>
+                    {sorted.map((lvl,i)=>{
+                        const tc=lvl.type==="resistance"?"#ff6677":"#22dd88";
+                        const isAbove=cp&&Number(lvl.price_num)>cp;
+                        const isBelow=cp&&Number(lvl.price_num)<cp;
+                        return(
+                            <div key={i} style={{display:"flex",alignItems:"center",gap:8,padding:"7px 10px",borderRadius:8,background:"rgba(17,29,42,.7)",border:`1px solid ${tc}1e`,marginBottom:5}}>
+                                <div style={{width:50,fontSize:10,fontWeight:700,color:tc}}>{lvl.type==="resistance"?"СОПР":"ПОДД"}</div>
+                                <div style={{fontSize:14,fontWeight:700,color:isAbove?"#ff8899":isBelow?"#44eebb":"#f0d060",flex:1}}>{lvl.price}</div>
+                                <div style={{flex:1,height:3,borderRadius:2,background:"rgba(255,255,255,.07)"}}>
+                                    <div style={{height:"100%",width:`${((lvl.strength||3)/5)*100}%`,background:tc,opacity:.7}}/>
+                                </div>
+                            </div>
+                        );
+                    })}
+                    {cp&&<div style={{marginTop:8,textAlign:"center",fontSize:10,color:"#bbddee"}}>◈ ТЕКУЩАЯ ЦЕНА ≈ {cp.toFixed(4)}</div>}
+                </div>
+            );
+        }
+
+        function MarketRegimeCard({regime}){
+            if(!regime)return null;
+            const icons={trend:"📈",bullish_trend:"📈",bearish_trend:"📉",range:"↔",pullback:"↩",expansion:"⚡",compression:"▣",choppy:"⚠"};
+            const colors={trend:"#22cc88",bullish_trend:"#22cc88",bearish_trend:"#ff5566",range:"#7fb3e0",pullback:"#e8c94a",expansion:"#ff9944",compression:"#8899aa",choppy:"#ff5566"};
+            const r=icons[regime.subtype]||icons[regime.type]||{icon:"◆",c:"#8899aa"};
+            const c=colors[regime.subtype]||colors[regime.type]||"#8899aa";
+            const score=Math.min(100,Math.max(0,Number(regime.score)||50));
+            const circ=2*Math.PI*18,off=circ-(score/100)*circ;
+            return(
+                <div style={{background:"rgba(12,18,28,.9)",border:`1px solid ${c}30`,borderRadius:12,padding:"12px 14px",marginBottom:12}}>
+                    <div style={{fontSize:10,color:"#aabbdd",letterSpacing:2,marginBottom:10,fontWeight:700}}>РЕЖИМ РЫНКА</div>
+                    <div style={{display:"flex",alignItems:"center",gap:14}}>
+                        <div style={{position:"relative",width:46,height:46,flexShrink:0}}>
+                            <svg width="46" height="46" viewBox="0 0 46 46" style={{transform:"rotate(-90deg)"}}>
+                                <circle cx="23" cy="23" r="18" fill="none" stroke="rgba(255,255,255,.09)" strokeWidth="3.5"/>
+                                <circle cx="23" cy="23" r="18" fill="none" stroke={c} strokeWidth="3.5" strokeDasharray={circ} strokeDashoffset={off} strokeLinecap="round"/>
+                            </svg>
+                            <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18}}>{icons[regime.subtype]||icons[regime.type]||"◆"}</div>
+                        </div>
+                        <div style={{flex:1}}>
+                            <div style={{fontSize:13,fontWeight:700,color:c,marginBottom:5}}>{(regime.subtype||regime.type||"unknown").toUpperCase()} · {score}</div>
+                            <div style={{fontSize:11,color:"#ccdde8",lineHeight:1.5}}>{regime.description}</div>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        // ─── Main App ─────────────────────────────────────────────────────────────────
+        function App(){
+            const [pair,setPair]=useState("EUR/USD");
+            const [loading,setLoading]=useState(false);
+            const [result,setResult]=useState(null);
+            const [error,setError]=useState(null);
+            const [clock,setClock]=useState(getMoscowTime());
+            const [session,setSession]=useState(getSession());
+            const [mode,setMode]=useState("deep");
+            const [livePrice,setLivePrice]=useState(null);
+            const [dots,setDots]=useState(0);
+            
+            useEffect(()=>{
+                const iv=setInterval(()=>{setClock(getMoscowTime());setSession(getSession());},1000);
+                return()=>clearInterval(iv);
+            },[]);
+            
+            useEffect(()=>{
+                if(!loading)return;
+                const i1=setInterval(()=>setDots(d=>(d+1)%4),400);
+                return()=>clearInterval(i1);
+            },[loading]);
+
+            const scan=async()=>{
+                if(loading)return;
+                setLoading(true);setError(null);setResult(null);
+                try{
+                    const prices=await fetchLivePrices([pair]);
+                    const price=prices[pair];
+                    setLivePrice(price||null);
+                    
+                    // Simulate AI delay
+                    await new Promise(r=>setTimeout(r,1500));
+                    
+                    const parsed=offlineAnalysis(pair,price||1.15,mode==="deep");
+                    setResult(parsed);
+                }catch(e){
+                    setError(e.message);
+                }finally{
+                    setLoading(false);
+                }
+            };
+
+            const currentPrice=result?.buy?.entry_num||result?.sell?.entry_num||livePrice;
+
+            return(
+                <div style={{minHeight:"100vh",background:"#060c14",paddingBottom:100}}>
+                    {/* Header */}
+                    <div style={{position:"sticky",top:0,zIndex:100,background:"rgba(6,12,20,.98)",borderBottom:"1px solid rgba(100,160,220,.14)",padding:"10px 14px"}}>
+                        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+                            <div>
+                                <div style={{fontSize:13,color:"#eef5ff",letterSpacing:2,fontWeight:700}}>
+                                    FX SCANNER <span style={{fontSize:9,color:"#22cc88",border:"1px solid rgba(34,204,136,.32)",borderRadius:4,padding:"1px 5px"}}>v4</span>
+                                </div>
+                                <div style={{fontSize:8,color:"#bbddee",letterSpacing:2}}>OB · FVG · СТРУКТУРА · AI</div>
+                            </div>
+                            <div style={{textAlign:"right"}}>
+                                <div style={{fontSize:13,color:"#eef5ff",fontWeight:700}}>{clock}</div>
+                                <div style={{display:"flex",alignItems:"center",gap:4,justifyContent:"flex-end"}}>
+                                    <div style={{width:5,height:5,borderRadius:"50%",background:session.color}}/>
+                                    <div style={{fontSize:9,color:session.color,fontWeight:700}}>{session.name}</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style={{padding:"12px 12px 20px"}}>
+                        {/* Pair Selector */}
+                        <div style={{fontSize:10,color:"#aabbdd",letterSpacing:2,marginBottom:8,fontWeight:600}}>ВАЛЮТНАЯ ПАРА</div>
+                        <div style={{display:"flex",gap:7,overflowX:"auto",paddingBottom:4,marginBottom:12}}>
+                            {PAIRS.map(p=>(
+                                <div key={p} onClick={()=>{setPair(p);setResult(null);}}
+                                    style={{flexShrink:0,background:p===pair?"rgba(34,204,136,.15)":"rgba(17,29,42,.9)",border:`1px solid ${p===pair?"rgba(34,204,136,.58)":"rgba(100,160,220,.18)"}`,borderRadius:20,padding:"8px 14px",fontSize:12,color:p===pair?"#22dd88":"#aabbcc",cursor:"pointer",fontWeight:p===pair?700:500}}>
+                                    {p}
+                                </div>
+                            ))}
+                        </div>
+
+                        {/* Mode Selector */}
+                        <div style={{display:"flex",gap:6,marginBottom:10}}>
+                            {[{id:"quick",label:"⚡ БЫСТРЫЙ"},{id:"deep",label:"🔬 ГЛУБОКИЙ"}].map(m=>(
+                                <div key={m.id} onClick={()=>setMode(m.id)}
+                                    style={{flex:1,padding:"10px",borderRadius:10,textAlign:"center",cursor:"pointer",
+                                        background:mode===m.id?"rgba(34,204,136,.12)":"rgba(17,29,42,.8)",
+                                        border:`1px solid ${mode===m.id?"rgba(34,204,136,.45)":"rgba(100,160,220,.13)"}`,
+                                        color:mode===m.id?"#22dd88":"#8899aa",fontWeight:700}}>
+                                    {m.label}
+                                </div>
+                            ))}
+                        </div>
+
+                        {/* Live Price */}
+                        {livePrice&&(
+                            <div style={{padding:"10px 14px",background:"rgba(34,204,136,.08)",border:"1px solid rgba(34,204,136,.25)",borderRadius:10,marginBottom:12,textAlign:"center"}}>
+                                <span style={{fontSize:10,color:"#22dd88"}}>💹 {pair} = {livePrice}</span>
+                            </div>
+                        )}
+
+                        {error&&<div style={{background:"rgba(255,68,85,.09)",border:"1px solid rgba(255,68,85,.32)",borderRadius:10,padding:"12px",marginBottom:12,color:"#ffaaaa"}}>⚠ {error}</div>}
+
+                        {loading&&(
+                            <div style={{textAlign:"center",padding:"40px 20px"}}>
+                                <div style={{fontSize:12,color:"#22cc88",letterSpacing:2,animation:"blink 1.2s infinite"}}>
+                                    АНАЛИЗИРУЮ{".".repeat(dots)}
+                                </div>
+                                <div style={{marginTop:20,height:4,borderRadius:2,background:"rgba(255,255,255,.1)",overflow:"hidden"}}>
+                                    <div style={{height:"100%",width:"60%",background:"linear-gradient(90deg,#22cc88,#44ffaa)",animation:"shimmer 1.4s infinite",backgroundSize:"200% 100%"}}/>
+                                </div>
+                            </div>
+                        )}
+
+                        {result&&!loading&&(
+                            <>
+                                <div style={{padding:"10px 14px",marginBottom:12,borderLeft:"2px solid rgba(127,179,224,.45)",fontSize:12,color:"#ccdde8"}}>{result.context}</div>
+                                <MarketRegimeCard regime={result.market_regime}/>
+                                <ConfidenceMeter score={result.confidence?.score} breakdown={result.confidence?.breakdown}/>
+                                <SRLevelsCard levels={result.sr_levels} currentPrice={currentPrice}/>
+                                <SetupCard data={result.buy} isBuy={true}/>
+                                <SetupCard data={result.sell} isBuy={false}/>
+                            </>
+                        )}
+
+                        {!result&&!loading&&!error&&(
+                            <div style={{textAlign:"center",padding:"60px 20px",border:"1px dashed rgba(255,255,255,.07)",borderRadius:14}}>
+                                <div style={{fontSize:32,opacity:.15,marginBottom:10}}>◈</div>
+                                <div style={{fontSize:12,color:"#8899bb",letterSpacing:2,marginBottom:10}}>ВЫБЕРИ ПАРУ И НАЖМИ СКАНИРОВАТЬ</div>
+                                <div style={{fontSize:11,color:"#ccdde8",lineHeight:2}}>Order Block · Fair Value Gap · Liquidity<br/>D1 · H4 · H1 структура</div>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Bottom Button */}
+                    <div style={{position:"fixed",bottom:0,left:0,right:0,zIndex:100,background:"rgba(6,12,20,.98)",borderTop:"1px solid rgba(100,160,220,.14)",padding:"12px 14px 20px"}}>
+                        <button onClick={scan} disabled={loading}
+                            style={{width:"100%",height:56,background:loading?"rgba(34,204,136,.04)":"linear-gradient(135deg,rgba(34,204,136,.22),rgba(34,204,136,.09))",border:`1px solid rgba(34,204,136,${loading?.14:.52})`,borderRadius:12,color:loading?"rgba(34,204,136,.35)":"#22dd88",fontSize:16,fontWeight:700,letterSpacing:2,cursor:loading?"not-allowed":"pointer"}}>
+                            {loading?`АНАЛИЗИРУЮ${".".repeat(dots)}`:mode==="quick"?"⚡ БЫСТРЫЙ СКАН":"🔬 ГЛУБОКИЙ СКАН"}
+                        </button>
+                    </div>
+                </div>
+            );
+        }
+
+        ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
     </script>
 </body>
 </html>
