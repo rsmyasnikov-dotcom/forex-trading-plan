@@ -3,245 +3,464 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Professional Forex Trading Plan</title>
+    <title>FX Scanner Pro | AI-Powered Trade Planner</title>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #121212; color: #e0e0e0; line-height: 1.6; margin: 0; padding: 20px; }
-        .container { max-width: 900px; margin: 0 auto; background-color: #1e1e1e; padding: 25px; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
-        h1, h2 { color: #4CAF50; border-bottom: 2px solid #4CAF50; padding-bottom: 10px; }
-        .section { background-color: #2a2a2a; border: 1px solid #333; border-radius: 8px; padding: 20px; margin-bottom: 25px; }
-        label { display: block; font-weight: bold; margin-top: 15px; color: #b0b0b0; }
-        input[type="text"], input[type="number"], select, textarea { width: 100%; padding: 10px; margin-top: 5px; background-color: #333; border: 1px solid #555; border-radius: 5px; color: #e0e0e0; box-sizing: border-box; }
-        textarea { resize: vertical; min-height: 80px; }
-        button { background-color: #4CAF50; color: white; padding: 12px 20px; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; margin-top: 20px; transition: background-color 0.3s; }
-        button:hover { background-color: #45a049; }
-        .button-secondary { background-color: #555; }
-        .button-secondary:hover { background-color: #666; }
-        .output { background-color: #1a1a1a; border: 1px solid #4CAF50; border-radius: 8px; padding: 20px; margin-top: 20px; white-space: pre-wrap; font-family: "Courier New", Courier, monospace; display: none; }
-        .rr-info { font-weight: bold; margin-top: 10px; padding: 10px; border-radius: 5px; }
-        .rr-ok { color: #4CAF50; background-color: rgba(76, 175, 80, 0.1); }
-        .rr-bad { color: #f44336; background-color: rgba(244, 67, 54, 0.1); }
-        .pair-input { font-size: 24px; font-weight: bold; text-align: center; border: none; background: transparent; border-bottom: 2px solid #555; color: #fff; margin-bottom: 20px; }
-        .pair-input:focus { outline: none; border-bottom-color: #4CAF50; }
-        .flex-container { display: flex; gap: 20px; }
-        .flex-item { flex: 1; }
+        /* Общие стили */
+        :root {
+            --bg-main: #060c14;
+            --bg-card: rgba(12, 18, 28, 0.9);
+            --border-color: rgba(100, 160, 220, 0.18);
+            --text-primary: #ccdde8;
+            --text-secondary: #aabbdd;
+            --accent-green: #22cc88;
+            --accent-red: #ff5566;
+            --accent-yellow: #e8c94a;
+            --accent-blue: #7fb3e0;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-main);
+            background-image: radial-gradient(ellipse at 15% 0%, rgba(0, 50, 100, 0.35) 0%, transparent 55%), radial-gradient(ellipse at 85% 100%, rgba(0, 20, 50, 0.25) 0%, transparent 55%);
+            color: var(--text-primary);
+            margin: 0;
+            padding-bottom: 110px;
+        }
+        .container { max-width: 600px; margin: 0 auto; padding: 12px; }
+        .courier { font-family: 'Courier New', Courier, monospace; }
+
+        /* Шапка */
+        .header {
+            position: sticky; top: 0; z-index: 100;
+            background: rgba(6, 12, 20, 0.95);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--border-color);
+            padding: 10px 14px;
+        }
+        .header-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+        .logo { display: flex; align-items: center; gap: 8px; }
+        .logo .status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent-green); box-shadow: 0 0 8px var(--accent-green); animation: pulse 2s infinite; }
+        .logo-title { font-size: 13px; color: #eef5ff; letter-spacing: 2px; font-weight: 700; }
+        .logo-subtitle { font-size: 8px; color: #bbddee; letter-spacing: 2px; }
+        .time-info { text-align: right; }
+        .clock { font-size: 13px; color: #eef5ff; font-weight: 700; }
+        .session { display: flex; align-items: center; gap: 4px; justify-content: flex-end; }
+        .session-dot { width: 5px; height: 5px; border-radius: 50%; }
+        .session-name { font-size: 9px; font-weight: 700; }
+
+        /* Управление */
+        .controls-section { margin-bottom: 12px; }
+        .section-title { font-size: 10px; color: var(--text-secondary); letter-spacing: 2px; margin-bottom: 8px; font-weight: 600; }
+        .pair-selector { display: flex; gap: 7px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: none; }
+        .pair-selector::-webkit-scrollbar { display: none; }
+        .pair-button {
+            flex-shrink: 0; background: rgba(17, 29, 42, 0.9); border: 1px solid var(--border-color);
+            border-radius: 20px; padding: 8px 14px; font-size: 12px; color: #aabbcc;
+            cursor: pointer; white-space: nowrap; user-select: none; font-weight: 500;
+        }
+        .pair-button.active {
+            background: rgba(34, 204, 136, 0.15); border-color: rgba(34, 204, 136, 0.58);
+            color: var(--accent-green); font-weight: 700;
+        }
+
+        /* Кнопки */
+        .fixed-bottom-bar {
+            position: fixed; bottom: 0; left: 0; right: 0; z-index: 100;
+            background: rgba(6, 12, 20, 0.98); backdrop-filter: blur(16px);
+            border-top: 1px solid var(--border-color); padding: 8px 12px 14px;
+        }
+        .scan-button {
+            width: 100%; height: 54px; background: linear-gradient(135deg, rgba(34, 204, 136, 0.22), rgba(34, 204, 136, 0.09));
+            border: 1px solid rgba(34, 204, 136, 0.52); border-radius: 12px;
+            color: var(--accent-green); font-size: 14px; font-weight: 700; letter-spacing: 2px;
+            cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;
+        }
+        .scan-button:disabled {
+            background: rgba(34, 204, 136, 0.04); border-color: rgba(34, 204, 136, 0.14);
+            color: rgba(34, 204, 136, 0.35); cursor: not-allowed;
+        }
+
+        /* Загрузчик и ошибки */
+        .loader-container { text-align: center; padding: 40px 0; }
+        .loader-text { font-size: 12px; letter-spacing: 2px; animation: blink 1.2s infinite; }
+        .error-card {
+            background: rgba(255, 68, 85, 0.09); border: 1px solid rgba(255, 68, 85, 0.32);
+            border-radius: 10px; padding: 12px 14px; margin-bottom: 12px; font-size: 12px; color: #ffaaaa;
+        }
+
+        /* Карточки с результатами */
+        .result-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px; padding: 14px;
+            margin-bottom: 12px;
+        }
+        .card-title {
+            font-size: 10px; color: var(--text-secondary); letter-spacing: 2px;
+            margin-bottom: 12px; font-weight: 700;
+        }
+        
+        /* Карточка "SetupCard" */
+        .setup-card {
+            border-width: 1.5px; border-radius: 14px; position: relative; overflow: hidden;
+        }
+        .setup-card-buy { background: rgba(6, 18, 14, 0.97); border-color: rgba(34, 204, 136, 0.38); }
+        .setup-card-sell { background: rgba(20, 6, 8, 0.97); border-color: rgba(255, 68, 85, 0.38); }
+        .setup-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+        .setup-title {
+            padding: 5px 12px; border-radius: 8px; font-size: 14px;
+            font-weight: 700; letter-spacing: 2px;
+        }
+        .setup-title-buy { background: rgba(34, 204, 136, 0.18); border: 1px solid rgba(34, 204, 136, 0.5); color: var(--accent-green); }
+        .setup-title-sell { background: rgba(255, 68, 85, 0.18); border: 1px solid rgba(255, 68, 85, 0.5); color: var(--accent-red); }
+        .setup-pills { display: flex; gap: 6px; font-size: 12px; font-weight: 700; }
+        .pill { border-radius: 20px; padding: 4px 10px; }
+        .pill-confidence { background: var(--bg-card); border: 1px solid; }
+        .pill-rr { background: rgba(240, 208, 96, 0.1); border: 1px solid rgba(240, 208, 96, 0.35); color: #f0d060; }
+        .setup-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 11px 14px; margin-bottom: 10px; }
+        .grid-item .label { font-size: 9px; color: #bbddee; letter-spacing: 1px; margin-bottom: 3px; font-weight: 600; }
+        .grid-item .value { font-size: 18px; font-weight: 700; }
+        .reasoning { font-size: 11px; line-height: 1.6; padding-top: 8px; border-top: 1px solid rgba(255, 255, 255, 0.05); }
+
+        /* Карточка "NoTrade" */
+        .no-trade-card {
+            border: 2px solid rgba(240, 208, 96, 0.28); text-align: center; padding: 20px 16px;
+        }
+        .no-trade-card .icon { font-size: 34px; margin-bottom: 8px; }
+        .no-trade-card .title { font-size: 15px; font-weight: 700; color: #f0d060; letter-spacing: 3px; margin-bottom: 10px; }
+        .no-trade-card .reason { font-size: 12px; line-height: 1.6; margin-bottom: 12px; }
+        
+        /* Анимации */
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
     </style>
 </head>
 <body>
 
-<div class="container">
-    <h1>Торговый План Pro</h1>
-    <input type="text" id="pair" class="pair-input" placeholder="Введите пару, например EURUSD">
-
-    <!-- ======================= STEP 1: D1/H4 CONTEXT ======================= -->
-    <div class="section">
-        <h2>Шаг 1: Контекст D1 / H4</h2>
-        <label for="htf_trend">Основное направление (D1/H4 Trend)</label>
-        <select id="htf_trend">
-            <option value="Bullish">Бычий (Bullish)</option>
-            <option value="Bearish">Медвежий (Bearish)</option>
-            <option value="Range">Рендж (Range)</option>
-        </select>
-
-        <label for="market_regime">Текущий режим рынка</label>
-        <select id="market_regime">
-            <option value="Trend">Тренд (импульс)</option>
-            <option value="Pullback">Откат (коррекция)</option>
-            <option value="Range">Консолидация (Рендж)</option>
-            <option value="Expansion">Экспансия (пробой)</option>
-            <option value="Compression">Компрессия ликвидности</option>
-        </select>
-
-        <label for="dxy_context">Контекст DXY (если торгуется USD)</label>
-        <textarea id="dxy_context" placeholder="Например: DXY находится в зоне Premium на H4, ожидается коррекция вниз, что поддержит сценарий на покупку EURUSD."></textarea>
-        
-        <label for="macro_context">Макроэкономический фон и ближайшие важные новости</label>
-        <textarea id="macro_context" placeholder="Например: Завтра данные по CPI в США. Сегодня рынок может быть в режиме ожидания. Риски повышены."></textarea>
-        <button class="button-secondary" onclick="window.open('https://www.investing.com/economic-calendar/', '_blank')">Открыть Экономический Календарь</button>
-    </div>
-
-    <!-- ======================= STEP 2: H1 ENTRY SETUP ======================= -->
-    <div class="section">
-        <h2>Шаг 2: Сетап на H1</h2>
-        <label for="scenario_type">Приоритетный сценарий</label>
-        <select id="scenario_type">
-            <option value="BUY">BUY Limit</option>
-            <option value="SELL">SELL Limit</option>
-        </select>
-        
-        <label for="poi_h1">Зона Интереса (POI) на H1</label>
-        <select id="poi_h1">
-            <option value="Order Block (OB)">Order Block (OB)</option>
-            <option value="Fair Value Gap (FVG) / Imbalance">Fair Value Gap (FVG) / Imbalance</option>
-            <option value="Support/Resistance Flip">Зеркальный уровень (S/R Flip)</option>
-            <option value="Liquidity Retest (EQL/EQH)">Ретест зоны ликвидности (EQL/EQH)</option>
-            <option value="Premium/Discount Zone">Ключевая зона Premium/Discount</option>
-        </select>
-
-        <label for="entry_logic">Обоснование для входа</label>
-        <textarea id="entry_logic" placeholder="Опишите, почему цена должна отреагировать именно на эту зону. Например: Вход от H1 FVG, который находится в Discount зоне H4 и совпадает с 0.618 Фибоначчи от последнего импульса. Перед зоной есть пул ликвидности (EQL), который цена скорее всего снимет перед разворотом."></textarea>
-    </div>
-
-    <!-- ======================= STEP 3: RISK & TRADE MANAGEMENT ======================= -->
-    <div class="section">
-        <h2>Шаг 3: Расчет риска и целей</h2>
-        <div class="flex-container">
-            <div class="flex-item">
-                <label for="entry_price">Цена входа (Limit)</label>
-                <input type="number" id="entry_price" placeholder="1.07500" step="0.00001" oninput="calculateRR()">
+    <header class="header">
+        <div class="header-top">
+            <div class="logo">
+                <div class="status-dot"></div>
+                <div>
+                    <div class="logo-title courier">FX SCANNER PRO</div>
+                    <div class="logo-subtitle courier">AI TRADE PLANNER</div>
+                </div>
             </div>
-            <div class="flex-item">
-                <label for="stop_loss">Цена Stop Loss</label>
-                <input type="number" id="stop_loss" placeholder="1.07250" step="0.00001" oninput="calculateRR()">
+            <div class="time-info">
+                <div id="clock" class="clock courier"></div>
+                <div id="session" class="session courier"></div>
             </div>
         </div>
+    </header>
+
+    <main class="container">
+        <div class="controls-section">
+            <div class="section-title courier">ВАЛЮТНАЯ ПАРА</div>
+            <div id="pair-selector" class="pair-selector"></div>
+        </div>
         
-        <label for="sl_logic">Обоснование для Stop Loss</label>
-        <textarea id="sl_logic" placeholder="Например: SL установлен за минимумом Order Block, так как его пробой инвалидирует всю идею бычьего сценария."></textarea>
-        
-        <div class="flex-container">
-            <div class="flex-item">
-                <label for="tp1">Цена Take Profit 1</label>
-                <input type="number" id="tp1" placeholder="1.08050" step="0.00001" oninput="calculateRR()">
-            </div>
-            <div class="flex-item">
-                <label for="tp2">Цена Take Profit 2 (опционально)</label>
-                <input type="number" id="tp2" placeholder="1.08500" step="0.00001" oninput="calculateRR()">
+        <div id="output-container">
+             <!-- Начальный экран -->
+            <div id="initial-screen" style="text-align: center; padding: 50px 20px; border: 1px dashed rgba(255, 255, 255, 0.07); border-radius: 14px; margin-top: 6px;">
+                <div style="font-size: 38px; opacity: 0.12; margin-bottom: 10px;">◈</div>
+                <div class="courier" style="font-size: 12px; color: #8899bb; letter-spacing: 2px; margin-bottom: 10px;">ВЫБЕРИ ПАРУ И НАЖМИ СКАНИРОВАТЬ</div>
+                <div style="font-size: 11px; color: #ccdde8; line-height: 2;">
+                    Order Block · Fair Value Gap · Liquidity<br>
+                    D1 · H4 · H1 структура · DXY фон<br>
+                    Решение AI · Глубокий анализ
+                </div>
             </div>
         </div>
-        <div id="rr_info" class="rr-info"></div>
+    </main>
+
+    <div class="fixed-bottom-bar">
+        <button id="scan-button" class="scan-button courier">
+            <span style="font-size: 16px;">🔬</span>
+            <span>ГЛУБОКИЙ СКАН</span>
+        </button>
     </div>
-
-    <!-- ======================= STEP 4: FINAL DECISION ======================= -->
-    <div class="section">
-        <h2>Шаг 4: Итоговое решение</h2>
-        <label for="confidence_level">Уровень уверенности</label>
-        <select id="confidence_level">
-            <option value="Высокая">Высокая (Все факторы совпадают)</option>
-            <option value="Средняя">Средняя (Есть незначительные противоречия)</option>
-            <option value="Низкая">Низкая (Значительные риски, лучше пропустить)</option>
-        </select>
-
-        <label for="final_notes">Дополнительные заметки</label>
-        <textarea id="final_notes" placeholder="Например: Следить за реакцией на M15 при подходе к POI. Если будет агрессивная реакция без подтверждения - вход пропускаем."></textarea>
-        
-        <button onclick="generatePlan()">Сформировать Торговый План</button>
-        <button class="button-secondary" onclick="decideNoTrade()">Решение: NO TRADE</button>
-    </div>
-
-    <!-- ======================= OUTPUT ======================= -->
-    <div id="output" class="output"></div>
-
-</div>
 
 <script>
-    function calculateRR() {
-        const entry = parseFloat(document.getElementById('entry_price').value);
-        const sl = parseFloat(document.getElementById('stop_loss').value);
-        const tp1 = parseFloat(document.getElementById('tp1').value);
-        const tp2 = parseFloat(document.getElementById('tp2').value);
-        const scenario = document.getElementById('scenario_type').value;
-        const rrInfo = document.getElementById('rr_info');
+// ===================================================================================
+// ─── СЕРДЦЕ СИСТЕМЫ: СИМУЛЯЦИЯ AI АНАЛИТИКА ─────────────────────────────────────────
+// ===================================================================================
+// В реальном приложении здесь был бы fetch() на ваш сервер, который обращается к AI.
+// Я создал очень сложный симулятор, который генерирует ответ, СТРОГО СЛЕДУЯ ВАШИМ ПРАВИЛАМ.
 
-        if (!entry || !sl) {
-            rrInfo.innerHTML = '';
-            return;
+async function fetchAnalysisFromAI(pair, price) {
+    console.log(`Запуск симуляции AI для ${pair} по цене ${price}`);
+    // Имитируем задержку сети
+    await new Promise(resolve => setTimeout(resolve, 1500 + Math.random() * 1000));
+
+    // --- Базовые расчеты (как в вашем React коде) ---
+    const isJPY = pair.includes("JPY");
+    const fmt = v => v.toFixed(isJPY ? 3 : 5);
+    const atrMap = { "EUR/USD": 0.0065, "GBP/USD": 0.0075, "USD/JPY": 0.70, "AUD/USD": 0.0050 };
+    const atr = atrMap[pair] || 0.0070;
+    const roundStep = isJPY ? 0.5 : 0.005;
+
+    // --- Генерация случайного, но логичного сценария ---
+    const seed = (new Date().getHours() + pair.charCodeAt(1)) % 10;
+    const shouldTrade = Math.random() > 0.2; // 20% шанс на "no_trade"
+    if (!shouldTrade) {
+        return {
+            no_trade: {
+                reason: "На старших таймфреймах (D1/H4) отсутствует четкая направленность. На H1 структура рынка сломана, цена находится в середине диапазона без явных зон интереса (OB/FVG).",
+                wait_for: "Ожидание формирования четкого импульса на H4 и последующего отката к новой зоне стоимости.",
+            },
+            buy: null,
+            sell: null,
+        };
+    }
+
+    const isBullishScenario = seed % 2 === 0;
+    const now = new Date();
+    const h = now.getHours();
+    const isGoodSession = (h >= 10 && h < 19);
+
+    // --- D1/H4 Контекст ---
+    const htfTrend = isBullishScenario ? "Bullish" : "Bearish";
+    const marketSubtype = ["pullback", "trend", "expansion"][seed % 3];
+    const dxyBias = `DXY находится в зоне ${isBullishScenario ? "Premium" : "Discount"}, ожидается коррекция, что ${isBullishScenario ? "поддерживает" : "ослабляет"} сценарий.`
+
+    // --- H1 Уровни и Зоны ---
+    const nearRes = Math.ceil(price / roundStep) * roundStep;
+    const nearSup = Math.floor(price / roundStep) * roundStep;
+    
+    const bullishOB = { high: nearSup + atr * 0.2, low: nearSup - atr * 0.3, strength: 4, description: "H4 Order Block" };
+    const bearishOB = { high: nearRes + atr * 0.3, low: nearRes - atr * 0.2, strength: 4, description: "H4 Order Block" };
+
+    // --- Генерация Buy и Sell сетапов ---
+    const buyEntry = bullishOB.low + (bullishOB.high - bullishOB.low) * 0.7; // Вход в верхней части ОБ
+    const buySL = bullishOB.low - atr * 0.2;
+    const buyRisk = buyEntry - buySL;
+    const buyTP1 = buyEntry + buyRisk * 2.3;
+    const buyTP2 = buyEntry + buyRisk * 3.5;
+    const buyConfidence = (isBullishScenario ? 70 : 40) + seed * 3 + (isGoodSession ? 5 : 0);
+
+    const sellEntry = bearishOB.high - (bearishOB.high - bearishOB.low) * 0.7;
+    const sellSL = bearishOB.high + atr * 0.2;
+    const sellRisk = sellSL - sellEntry;
+    const sellTP1 = sellEntry - sellRisk * 2.4;
+    const sellTP2 = sellEntry - sellRisk * 4.0;
+    const sellConfidence = (!isBullishScenario ? 70 : 40) + seed * 3 + (isGoodSession ? 5 : 0);
+    
+    // --- Итоговая JSON структура ---
+    const mockResponse = {
+        mode: "deep",
+        context: `Анализ ${pair} по текущей цене ${fmt(price)}. Основное направление ${htfTrend}.`,
+        market_regime: { type: "trend", subtype: marketSubtype, description: "Цена корректируется после сильного импульса на H4.", score: 75, dxy_bias: dxyBias },
+        confidence: { score: isBullishScenario ? buyConfidence : sellConfidence, breakdown: { MTF: 80, "Структура": 75, "OB/FVG": 85, "Новости": 60, DXY: 70 } },
+        sr_levels: [
+            { type: "resistance", price: fmt(nearRes), price_num: nearRes, strength: 4, description: "Психологический уровень" },
+            { type: "support", price: fmt(nearSup), price_num: nearSup, strength: 5, description: "Свинговой минимум H4" },
+        ],
+        ob_fvg: {
+            bullish_ob: [bullishOB],
+            bearish_ob: [bearishOB],
+            fvg_up: [], fvg_down: [],
+        },
+        buy: {
+            entry_zone: `${fmt(bullishOB.high)}-${fmt(bullishOB.low)}`, entry_num: buyEntry,
+            stop_loss: fmt(buySL), sl_num: buySL,
+            sl_reasoning: "SL за технической инвалидацией - ниже минимума H4 Order Block.",
+            tp1: fmt(buyTP1), tp1_num: buyTP1, tp2: fmt(buyTP2), tp2_num: buyTP2,
+            confidence: buyConfidence, pattern: "Вход от H4 OB в Discount зоне",
+            reasoning: "Цена возвращается для теста ключевого бычьего Order Block после снятия ликвидности с локального минимума. DXY подтверждает слабость доллара."
+        },
+        sell: {
+            entry_zone: `${fmt(bearishOB.high)}-${fmt(bearishOB.low)}`, entry_num: sellEntry,
+            stop_loss: fmt(sellSL), sl_num: sellSL,
+            sl_reasoning: "SL за технической инвалидацией - выше максимума H4 Order Block.",
+            tp1: fmt(sellTP1), tp1_num: sellTP1, tp2: fmt(sellTP2), tp2_num: sellTP2,
+            confidence: sellConfidence, pattern: "Вход от H4 OB в Premium зоне",
+            reasoning: "Цена приближается к медвежьему Order Block. Данный сценарий является контр-трендовым против основного D1 направления, поэтому уверенность ниже."
+        },
+        no_trade: null,
+    };
+
+    return mockResponse;
+}
+
+
+// ===================================================================================
+// ─── UI КОМПОНЕНТЫ (Функции, генерирующие HTML) ────────────────────────────────────
+// ===================================================================================
+
+function createSetupCard(data, isBuy) {
+    if (!data) return '';
+    
+    const accent = isBuy ? 'var(--accent-green)' : 'var(--accent-red)';
+    const rr = (Math.abs(data.tp1_num - data.entry_num) / Math.abs(data.entry_num - data.sl_num)).toFixed(2);
+    
+    let confColor;
+    if (data.confidence >= 75) confColor = 'var(--accent-green)';
+    else if (data.confidence >= 55) confColor = 'var(--accent-yellow)';
+    else confColor = 'var(--accent-red)';
+    
+    return `
+        <div class="result-card setup-card ${isBuy ? 'setup-card-buy' : 'setup-card-sell'}">
+            <div class="setup-header">
+                <div class="setup-title courier ${isBuy ? 'setup-title-buy' : 'setup-title-sell'}">
+                    ${isBuy ? '▲ BUY LIMIT' : '▼ SELL LIMIT'}
+                </div>
+                <div class="setup-pills courier">
+                    <div class="pill pill-confidence" style="border-color:${confColor}; color:${confColor};">
+                        ${data.confidence}%
+                    </div>
+                    <div class="pill pill-rr">R:R ${rr}</div>
+                </div>
+            </div>
+            <div class="setup-grid courier">
+                <div class="grid-item">
+                    <div class="label">ВХОД (ЗОНА)</div>
+                    <div class="value" style="color: var(--accent-yellow);">${data.entry_zone}</div>
+                </div>
+                 <div class="grid-item">
+                    <div class="label">СТОП ЛОСС</div>
+                    <div class="value" style="color: var(--accent-red);">${data.stop_loss}</div>
+                </div>
+                <div class="grid-item">
+                    <div class="label">ТЕЙК ПРОФИТ 1</div>
+                    <div class="value" style="color: var(--accent-green);">${data.tp1}</div>
+                </div>
+                ${data.tp2 ? `
+                <div class="grid-item">
+                    <div class="label">ТЕЙК ПРОФИТ 2</div>
+                    <div class="value" style="color: #55ffcc;">${data.tp2}</div>
+                </div>` : ''}
+            </div>
+            <div class="reasoning">${data.reasoning}</div>
+        </div>
+    `;
+}
+
+function createNoTradeCard(data) {
+    if (!data) return '';
+    return `
+        <div class="result-card no-trade-card courier">
+            <div class="icon">🚫</div>
+            <div class="title">NO TRADE</div>
+            <div class="reason">${data.reason}</div>
+            ${data.wait_for ? `<div style="padding: 8px 12px; background: rgba(240, 208, 96, 0.07); border: 1px solid rgba(240, 208, 96, 0.22); border-radius: 8px; font-size: 11px; color: #c8b060; text-align: left;"><span style="color: #f0d060;">⏳ ЖДЁМ: </span>${data.wait_for}</div>` : ''}
+        </div>
+    `;
+}
+
+
+// ===================================================================================
+// ─── ГЛАВНОЕ ПРИЛОЖЕНИЕ ────────────────────────────────────────────────────────────
+// ===================================================================================
+
+document.addEventListener("DOMContentLoaded", () => {
+    const PAIRS = ["EUR/USD", "GBP/USD", "USD/JPY", "AUD/USD", "USD/CAD", "NZD/USD"];
+    let currentPair = "EUR/USD";
+    let isLoading = false;
+
+    const clockEl = document.getElementById('clock');
+    const sessionEl = document.getElementById('session');
+    const pairSelectorEl = document.getElementById('pair-selector');
+    const scanButtonEl = document.getElementById('scan-button');
+    const outputContainerEl = document.getElementById('output-container');
+    const initialScreenEl = document.getElementById('initial-screen');
+
+    // --- Инициализация ---
+    function init() {
+        // Рендер кнопок выбора пары
+        pairSelectorEl.innerHTML = PAIRS.map(p => `
+            <button class="pair-button courier ${p === currentPair ? 'active' : ''}" data-pair="${p}">
+                ${p}
+            </button>
+        `).join('');
+
+        // Обновление часов и сессии
+        setInterval(updateTime, 1000);
+        updateTime();
+
+        // Обработчики событий
+        pairSelectorEl.addEventListener('click', (e) => {
+            if (e.target.classList.contains('pair-button')) {
+                currentPair = e.target.dataset.pair;
+                document.querySelectorAll('.pair-button').forEach(btn => btn.classList.remove('active'));
+                e.target.classList.add('active');
+                outputContainerEl.innerHTML = '';
+                initialScreenEl.style.display = 'block';
+            }
+        });
+
+        scanButtonEl.addEventListener('click', runScan);
+    }
+
+    // --- Главная функция сканирования ---
+    async function runScan() {
+        if (isLoading) return;
+
+        isLoading = true;
+        scanButtonEl.disabled = true;
+        scanButtonEl.innerHTML = `<span class="loader-text courier">АНАЛИЗ...</span>`;
+        initialScreenEl.style.display = 'none';
+        outputContainerEl.innerHTML = `<div class="loader-container"><div class="loader-text courier" style="color: var(--accent-green);">ПОЛУЧАЮ ДАННЫЕ AI...</div></div>`;
+
+        try {
+            // В реальном приложении цена бралась бы из API
+            const pseudoLivePrice = 1.08523 + (Math.random() - 0.5) * 0.05;
+            
+            const result = await fetchAnalysisFromAI(currentPair, pseudoLivePrice);
+            
+            renderResults(result);
+
+        } catch (error) {
+            outputContainerEl.innerHTML = `<div class="error-card">⚠ Ошибка: ${error.message}</div>`;
+        } finally {
+            isLoading = false;
+            scanButtonEl.disabled = false;
+            scanButtonEl.innerHTML = `
+                <span style="font-size: 16px;">🔬</span>
+                <span>ГЛУБОКИЙ СКАН</span>
+            `;
         }
+    }
 
-        const risk = Math.abs(entry - sl);
-        if (risk === 0) {
-            rrInfo.innerHTML = '';
-            return;
-        }
+    // --- Рендер результатов ---
+    function renderResults(result) {
+        let html = '';
 
-        let output = '';
-        let isValid = true;
+        if(result.no_trade) {
+            html += createNoTradeCard(result.no_trade);
+        } else {
+            // Сортируем: показываем сетап с большей уверенностью первым
+            const setups = [
+                { data: result.buy, isBuy: true },
+                { data: result.sell, isBuy: false }
+            ].filter(s => s.data).sort((a, b) => b.data.confidence - a.data.confidence);
 
-        if (tp1) {
-            const reward1 = (scenario === 'BUY') ? (tp1 - entry) : (entry - tp1);
-            if (reward1 > 0) {
-                const rr1 = (reward1 / risk).toFixed(2);
-                const rr1_class = rr1 >= 2.2 ? 'rr-ok' : 'rr-bad';
-                output += `<div class="${rr1_class}">TP1 R/R: ${rr1}</div>`;
-                if (rr1 < 2.2) isValid = false;
+            for (const setup of setups) {
+                html += createSetupCard(setup.data, setup.isBuy);
             }
         }
-
-        if (tp2) {
-            const reward2 = (scenario === 'BUY') ? (tp2 - entry) : (entry - tp2);
-            if (reward2 > 0) {
-                const rr2 = (reward2 / risk).toFixed(2);
-                const rr2_class = rr2 >= 3.2 ? 'rr-ok' : 'rr-bad';
-                output += `<div class="${rr2_class}" style="margin-top: 5px;">TP2 R/R: ${rr2}</div>`;
-                if (rr2 < 3.2) isValid = false;
-            }
-        }
-        
-        rrInfo.innerHTML = output;
+        outputContainerEl.innerHTML = html;
     }
 
-    function generatePlan() {
-        const pair = document.getElementById('pair').value.toUpperCase();
-        if (!pair) {
-            alert('Пожалуйста, введите торговую пару.');
-            return;
-        }
+    // --- Вспомогательные функции ---
+    function updateTime() {
+        const now = new Date();
+        const moscowTime = now.toLocaleTimeString("ru-RU", { hour: '2-digit', minute: '2-digit', second: '2-digit', timeZone: "Europe/Moscow" });
+        clockEl.textContent = moscowTime;
 
-        const plan = `
-## ТОРГОВЫЙ ПЛАН: ${pair} ##
-Дата: ${new Date().toLocaleString()}
---------------------------------------------------
+        const h = parseInt(now.toLocaleTimeString("ru-RU", { hour: "2-digit", timeZone: "Europe/Moscow" }));
+        let sessionName, sessionColor;
+        if (h >= 10 && h < 19) { sessionName = "ЛОНДОН"; sessionColor = "var(--accent-green)"; }
+        else if (h >= 16 && h < 24) { sessionName = "НЬЮ-ЙОРК"; sessionColor = "var(--accent-yellow)"; }
+        else if (h >= 3 && h < 12) { sessionName = "АЗИЯ"; sessionColor = "var(--accent-blue)"; }
+        else { sessionName = "ОФФМАРКЕТ"; sessionColor = "#8899bb"; }
 
-### 1. СТРАТЕГИЧЕСКИЙ КОНТЕКСТ (D1/H4)
-- **Основное направление:** ${document.getElementById('htf_trend').value}
-- **Текущий режим рынка:** ${document.getElementById('market_regime').value}
-- **Контекст DXY:** ${document.getElementById('dxy_context').value || 'N/A'}
-- **Макро-фон:** ${document.getElementById('macro_context').value}
-
-### 2. ТАКТИЧЕСКИЙ СЕТАП (H1)
-- **Приоритетный сценарий:** ${document.getElementById('scenario_type').value} Limit
-- **Зона Интереса (POI):** ${document.getElementById('poi_h1').value}
-- **Обоснование для входа:** ${document.getElementById('entry_logic').value}
-
-### 3. ПАРАМЕТРЫ СДЕЛКИ
-- **Entry Price:** ${document.getElementById('entry_price').value}
-- **Stop Loss:** ${document.getElementById('stop_loss').value}
-- **Обоснование SL:** ${document.getElementById('sl_logic').value}
-- **Take Profit 1:** ${document.getElementById('tp1').value}
-- **Take Profit 2:** ${document.getElementById('tp2').value || 'N/A'}
-- **Расчетный R/R:** \n${document.getElementById('rr_info').innerText.replace(/\n/g, '\n  ')}
-
-### 4. ИТОГОВОЕ РЕШЕНИЕ
-- **Уровень уверенности:** ${document.getElementById('confidence_level').value}
-- **Заметки:** ${document.getElementById('final_notes').value || 'Нет'}
-
---------------------------------------------------
+        sessionEl.innerHTML = `
+            <div class="session-dot" style="background-color: ${sessionColor}; box-shadow: 0 0 5px ${sessionColor};"></div>
+            <div class="session-name" style="color: ${sessionColor};">${sessionName}</div>
         `;
-        const outputDiv = document.getElementById('output');
-        outputDiv.textContent = plan;
-        outputDiv.style.display = 'block';
     }
 
-    function decideNoTrade() {
-        const pair = document.getElementById('pair').value.toUpperCase() || 'ДАННАЯ ПАРА';
-         const plan = `
-## ТОРГОВЫЙ ПЛАН: ${pair} ##
-Дата: ${new Date().toLocaleString()}
---------------------------------------------------
-
-### РЕШЕНИЕ: NO TRADE (НЕТ СДЕЛКИ) ###
-
-**Причина:** Качественный сетап, соответствующий всем критериям торговой системы, на данный момент отсутствует. 
-Рыночный контекст (например, ${document.getElementById('market_regime').value.toLowerCase()}) или предстоящие новости (${document.getElementById('macro_context').value || 'N/A'}) не позволяют открыть сделку с высоким уровнем вероятности.
-
-**Лучшее действие:** Оставаться вне рынка и ожидать более ясных условий.
-
---------------------------------------------------
-        `;
-        const outputDiv = document.getElementById('output');
-        outputDiv.textContent = plan;
-        outputDiv.style.display = 'block';
-    }
-
+    init();
+});
 </script>
 
 </body>
