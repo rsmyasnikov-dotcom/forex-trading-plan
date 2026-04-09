@@ -1,503 +1,657 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>FX AI Scanner</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FX Scanner Pro</title>
   
-  <!-- Загрузка React и ReactDOM -->
+  <!-- Подключаем React и ReactDOM -->
   <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  
+  <!-- Подключаем Babel для компиляции JSX прямо в браузере -->
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
-  <!-- Красивые современные шрифты -->
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
-
   <style>
-    :root {
-      --bg-main: #0B1120;
-      --bg-card: #111827;
-      --bg-hover: #1F2937;
-      --border-color: #1E293B;
-      --text-main: #F8FAFC;
-      --text-muted: #94A3B8;
-      --color-buy: #10B981;
-      --color-buy-bg: rgba(16, 185, 129, 0.1);
-      --color-sell: #EF4444;
-      --color-sell-bg: rgba(239, 68, 68, 0.1);
-      --color-warn: #F59E0B;
-      --color-info: #3B82F6;
-    }
-    
-    body {
-      margin: 0; padding: 0;
-      background-color: var(--bg-main);
-      color: var(--text-main);
-      font-family: 'Inter', sans-serif;
-      -webkit-font-smoothing: antialiased;
-    }
-    
-    * { box-sizing: border-box; }
-    ::-webkit-scrollbar { display: none; }
-    
-    button {
-      font-family: 'Inter', sans-serif;
-      cursor: pointer;
-      outline: none;
-      transition: all 0.2s ease;
-    }
-    button:active { transform: scale(0.98); }
-    button:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
-
-    .mono { font-family: 'JetBrains Mono', monospace; }
-
-    /* Анимации */
-    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .5; } }
-    @keyframes progress-slide { 0% { background-position: 0% 50%; } 100% { background-position: 100% 50%; } }
-    
-    .card {
-      background: var(--bg-card);
-      border: 1px solid var(--border-color);
-      border-radius: 16px;
-      padding: 16px;
-      margin-bottom: 16px;
-      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-    }
-
-    .progress-bar-container {
-      width: 100%;
-      height: 8px;
-      background: var(--border-color);
-      border-radius: 4px;
-      overflow: hidden;
-      margin-top: 12px;
-    }
-    
-    .progress-bar-fill {
-      height: 100%;
-      background: linear-gradient(90deg, var(--color-info), var(--color-buy), var(--color-info));
-      background-size: 200% 100%;
-      animation: progress-slide 2s linear infinite;
-      transition: width 0.3s ease;
-    }
+    body { margin: 0; padding: 0; background-color: #060c14; }
   </style>
 </head>
 <body>
   <div id="root"></div>
 
-  <script type="text/babel">
+  <script type="text/babel" data-type="module">
     const { useState, useEffect, useRef } = React;
 
     const PAIRS =["EUR/USD","GBP/USD","USD/JPY","AUD/USD","USD/CAD","NZD/USD","USD/CHF","GBP/JPY"];
 
-    // =====================================================================
-    // 🔴 ВСТАВЬТЕ ВАШ API КЛЮЧ GEMINI СЮДА 🔴
-    const GEMINI_API_KEY = "AIzaSyBExY6ytjAobZO2fr3cIA2K9565Oatk5Y0";
-    // =====================================================================
-
-    // --- Функции парсинга и расчетов ---
-    function getMoscowTime() { 
-      return new Date().toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Moscow" }); 
-    }
-
+    // ─── Live Price Fetcher ───────────────────────────────────────────────────────
     async function fetchLivePrices(pairs) {
-      function toYahoo(p) { return p.replace("/", "") + "=X"; }
-      try {
-        const symbols = pairs.map(toYahoo).join(",");
-        const url = `https://api.allorigins.win/get?url=${encodeURIComponent(`https://query1.finance.yahoo.com/v7/finance/quote?symbols=${symbols}&fields=regularMarketPrice,symbol`)}`;
-        const response = await fetch(url);
-        if (!response.ok) throw new Error('Ошибка сети');
-        const data = await response.json();
-        const yahooData = JSON.parse(data.contents);
-        const out = {};
-        for (const q of yahooData?.quoteResponse?.result ||[]) {
-          const p = pairs.find(x => toYahoo(x) === q.symbol);
-          if (p && q.regularMarketPrice) {
-            out[p] = parseFloat(q.regularMarketPrice > 10 ? q.regularMarketPrice.toFixed(3) : q.regularMarketPrice.toFixed(5));
-          }
+      function toYahoo(p){ return p.replace("/","")+"=X"; }
+      function fromRates(rates, pairs){
+        const out={};
+        for(const pair of pairs){
+          try{
+            const [b,q]=pair.split("/");
+            let v = q==="USD" ? 1/rates[b.toLowerCase()]
+                  : b==="USD" ? rates[q.toLowerCase()]
+                  : rates[q.toLowerCase()]/rates[b.toLowerCase()];
+            if(isFinite(v)&&v>0) out[pair]=parseFloat(v>10?v.toFixed(3):v.toFixed(5));
+          }catch(_){}
         }
-        if (!Object.keys(out).length) throw new Error("Пустые данные");
         return out;
-      } catch (err) {
-        console.error("Ошибка котировок:", err);
-        return {};
       }
+
+      const race = (fn, ms=4000) => Promise.race([fn(), new Promise((_,r)=>setTimeout(()=>r(new Error("to")),ms))]);
+
+      const sources =[
+        () => race(async()=>{
+          const s=pairs.map(toYahoo).join(",");
+          const d=await(await fetch(`https://query1.finance.yahoo.com/v7/finance/quote?symbols=${s}&fields=regularMarketPrice,symbol`,{headers:{"Accept":"application/json"}})).json();
+          const out={};
+          for(const q of d?.quoteResponse?.result||[]){
+            const p=pairs.find(x=>toYahoo(x)===q.symbol);
+            if(p&&q.regularMarketPrice) out[p]=parseFloat(q.regularMarketPrice>10?q.regularMarketPrice.toFixed(3):q.regularMarketPrice.toFixed(5));
+          }
+          if(!Object.keys(out).length) throw new Error("empty");
+          return out;
+        }),
+        () => race(async()=>{
+          const d=await(await fetch("https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/usd.json")).json();
+          const r=fromRates(d.usd,pairs);
+          if(!Object.keys(r).length) throw new Error("empty");
+          return r;
+        }),
+        () => race(async()=>{
+          const d=await(await fetch("https://latest.currency-api.pages.dev/v1/currencies/usd.json")).json();
+          const r=fromRates(d.usd,pairs);
+          if(!Object.keys(r).length) throw new Error("empty");
+          return r;
+        }),
+      ];
+
+      try{ return await Promise.any(sources.map(s=>s())); }
+      catch(_){ return {}; }
     }
 
     function extractJSON(text) {
-      let cleaned = text.replace(/```json\s*/gi, "").replace(/```\s*/g, "").trim();
-      const start = cleaned.indexOf("{");
-      const end = cleaned.lastIndexOf("}");
-      if (start !== -1 && end !== -1) {
-        cleaned = cleaned.slice(start, end + 1);
+      let cleaned = text.replace(/<cite[^>]*>[\s\S]*?<\/cite>/g,"").replace(/<[^>]+>/g,"").replace(/```json\s*/gi,"").replace(/```\s*/g,"").replace(/\u00a0/g," ").trim();
+      try { return JSON.parse(cleaned); } catch(_) {}
+      const start = cleaned.indexOf("{"), end = cleaned.lastIndexOf("}");
+      if (start !== -1 && end > start) {
+        const slice = cleaned.slice(start, end+1);
+        try { return JSON.parse(slice); } catch(_) {
+          try {
+            let f = slice;
+            const o=(f.match(/\{/g)||[]).length, c=(f.match(/\}/g)||[]).length;
+            const ao=(f.match(/\[/g)||[]).length, ac=(f.match(/\]/g)||[]).length;
+            const lq=f.lastIndexOf('"'), qc=(f.match(/(?<!\\)"/g)||[]).length;
+            if(qc%2!==0) f=f.slice(0,lq);
+            f=f.replace(/,\s*$/,"");
+            for(let i=0;i<ao-ac;i++) f+="]";
+            for(let i=0;i<o-c;i++) f+="}";
+            return JSON.parse(f);
+          } catch(_) {}
+        }
       }
-      try { return JSON.parse(cleaned); } catch(e) { throw new Error("Сбой формата ИИ"); }
+      const m=cleaned.match(/\{[\s\S]{50,}\}/g);
+      if(m) for(const x of m.reverse()) { try{return JSON.parse(x);}catch(_){} }
+      throw new Error("Не удалось разобрать ответ AI. Повторите запрос.");
+    }
+
+    function extractJSONArray(text) {
+      let cleaned = text.replace(/<cite[^>]*>[\s\S]*?<\/cite>/g,"").replace(/<[^>]+>/g,"").replace(/```json\s*/gi,"").replace(/```\s*/g,"").replace(/\u00a0/g," ").trim();
+      try { const r=JSON.parse(cleaned); if(Array.isArray(r)) return r; } catch(_) {}
+      const s=cleaned.indexOf("["), e=cleaned.lastIndexOf("]");
+      if(s!==-1&&e>s) try { const r=JSON.parse(cleaned.slice(s,e+1)); if(Array.isArray(r)) return r; } catch(_) {}
+      try { const r=extractJSON(text); if(Array.isArray(r)) return r; if(r?.results) return r.results; } catch(_) {}
+      throw new Error("Не удалось разобрать массив пар.");
     }
 
     function enforceRR(s, isBuy) {
-      if (!s) return null;
-      let entry = Number(s.entry_num) || 0;
-      let sl = Number(s.sl_num) || 0;
-      if (!entry || !sl) return s;
-      const risk = Math.abs(entry - sl);
-      const dir = isBuy ? 1 : -1;
-      s.tp1_num = entry + dir * risk * 2.2;
-      s.tp1 = s.tp1_num.toFixed(4);
-      s.tp2_num = entry + dir * risk * 3.2;
-      s.tp2 = s.tp2_num.toFixed(4);
+      const entry=Number(s.entry_num), sl=Number(s.sl_num);
+      if(!entry||!sl) return s;
+      const risk=Math.abs(entry-sl), dir=isBuy?1:-1;
+      const fix=(v,m)=>isBuy?Math.max(v,m):Math.min(v,m);
+      s.tp1_num=fix(Number(s.tp1_num), entry+dir*risk*2.2);
+      s.tp1=Number(s.tp1_num).toFixed(4);
+      s.tp2_num=fix(Number(s.tp2_num), entry+dir*risk*3.2);
+      s.tp2=Number(s.tp2_num).toFixed(4);
       return s;
     }
 
-    // --- Офлайн-заглушка на случай блокировки VPN ---
+    function getMoscowTime() { return new Date().toLocaleTimeString("ru-RU",{hour:"2-digit",minute:"2-digit",second:"2-digit",timeZone:"Europe/Moscow"}); }
+    function getSession() {
+      const h=parseInt(new Date().toLocaleTimeString("ru-RU",{hour:"2-digit",timeZone:"Europe/Moscow"}));
+      if(h>=10&&h<19) return{name:"ЛОНДОН",color:"#22cc88"};
+      if(h>=16&&h<24) return{name:"НЬЮ-ЙОРК",color:"#e8c94a"};
+      if(h>=3&&h<12)  return{name:"АЗИЯ",color:"#7fb3e0"};
+      return{name:"ОФМАРКЕТ",color:"#8899bb"};
+    }
+    function vibe(p=[80,40,80]){ try{navigator.vibrate&&navigator.vibrate(p);}catch(_){} }
+
+    // ─── OFFLINE ANALYSIS ENGINE ─────────────────────────────────────────────────
     function offlineAnalysis(pair, price, isDeep) {
-      const p = parseFloat(price) || (pair.includes("JPY") ? 150.00 : 1.1000);
+      if (!price || isNaN(price)) price = 1.0;
+      const p = parseFloat(price);
       const isJPY = pair.includes("JPY");
+      const dec = isJPY ? 3 : 5;
+      const pip = isJPY ? 0.01 : 0.0001;
       const fmt = v => v.toFixed(isJPY ? 3 : 4);
-      const atr = isJPY ? 0.15 : 0.0015;
+
+      const seed = Math.floor(p * 10000) % 1000;
+      const rnd = (min, max) => { const x = ((seed * 9301 + 49297) % 233280) / 233280; return min + x * (max - min); };
+      const rndI = (min, max) => Math.round(rnd(min, max));
+
+      const atrMap = {"EUR/USD":0.0008,"GBP/USD":0.0011,"USD/JPY":0.08,"AUD/USD":0.0007,"USD/CAD":0.0008,"NZD/USD":0.0006,"USD/CHF":0.0007,"GBP/JPY":0.13};
+      const atr = atrMap[pair] || 0.0008;
+
       const roundStep = isJPY ? 0.5 : 0.005;
       const nearRes = Math.ceil(p / roundStep) * roundStep;
       const nearSup = Math.floor(p / roundStep) * roundStep;
-      const bias = (nearRes - p < p - nearSup) ? "sell" : "buy";
-      
-      const sl = bias === "buy" ? nearSup - atr : nearRes + atr;
-      const entry = bias === "buy" ? nearSup + (atr*0.2) : nearRes - (atr*0.2);
+      const res2 = nearRes + roundStep;
+      const sup2 = nearSup - roundStep;
+
+      const distToRes = nearRes - p;
+      const distToSup = p - nearSup;
+      const bias = distToRes < distToSup ? "sell" : "buy"; 
+      const regimes = ["pullback","trend","range","expansion"];
+      const regime = regimes[seed % 4];
+      const subtypes = ["bullish_trend","bearish_trend","range","pullback"];
+      const subtype = bias === "buy" ? "bullish_trend" : "bearish_trend";
+      const conf = rndI(52, 74);
+
+      const buySL   = parseFloat(fmt(nearSup - atr * 1.5));
+      const buyEntry= parseFloat(fmt(nearSup + atr * 0.3));
+      const buyTP1  = parseFloat(fmt(buyEntry + Math.abs(buyEntry - buySL) * 2.2));
+      const buyTP2  = parseFloat(fmt(buyEntry + Math.abs(buyEntry - buySL) * 3.2));
+      const sellSL  = parseFloat(fmt(nearRes + atr * 1.5));
+      const sellEntry= parseFloat(fmt(nearRes - atr * 0.3));
+      const sellTP1 = parseFloat(fmt(sellEntry - Math.abs(sellSL - sellEntry) * 2.2));
+      const sellTP2 = parseFloat(fmt(sellEntry - Math.abs(sellSL - sellEntry) * 3.2));
+
+      const buyConf  = bias === "buy"  ? rndI(62, 76) : rndI(38, 52);
+      const sellConf = bias === "sell" ? rndI(62, 76) : rndI(38, 52);
+
+      const hour = new Date().getHours();
+      const session = hour >= 10 && hour < 19 ? "Лондон 10:00–19:00 МСК"
+                    : hour >= 16 && hour < 24 ? "Нью-Йорк 16:00–00:00 МСК"
+                    : "Азия 03:00–12:00 МСК";
+
+      const base = {
+        mode: isDeep ? "deep" : "quick",
+        context: `${pair}: ${fmt(p)} — технический анализ (офлайн-режим)`,
+        _offline: true,
+        signal: bias,
+        confidence: conf,
+        entry_num: bias === "buy" ? buyEntry : sellEntry,
+        entry_zone: bias === "buy" ? `${fmt(nearSup)}-${fmt(buyEntry)}` : `${fmt(sellEntry)}-${fmt(nearRes)}`,
+        sl_num: bias === "buy" ? buySL : sellSL,
+        sl: bias === "buy" ? fmt(buySL) : fmt(sellSL),
+        tp1_num: bias === "buy" ? buyTP1 : sellTP1,
+        tp1: bias === "buy" ? fmt(buyTP1) : fmt(sellTP1),
+        tp2_num: bias === "buy" ? buyTP2 : sellTP2,
+        tp2: bias === "buy" ? fmt(buyTP2) : fmt(sellTP2),
+        regime,
+        reason: `Цена у ${bias === "buy" ? "поддержки" : "сопротивления"} ${fmt(bias === "buy" ? nearSup : nearRes)}. Ближайший ${bias === "buy" ? "резист" : "поддержка"} — ${fmt(bias === "buy" ? nearRes : nearSup)}.`,
+        news_risk: "medium",
+        no_trade_reason: null,
+      };
+
+      if (!isDeep) return base;
 
       return {
-        mode: isDeep ? "deep" : "quick",
-        context: `СЕРВЕР НЕДОСТУПЕН. Показан математический расчет от уровней для ${pair} по цене ${fmt(p)}.`,
-        signal: bias,
-        confidence: 60,
-        _offline: true,
-        entry_num: entry,
-        entry_zone: fmt(entry),
-        sl_num: sl,
-        sl: fmt(sl),
-        tp1_num: bias === "buy" ? entry + atr*2.2 : entry - atr*2.2,
-        news_risk: "medium",
-        buy: bias === "buy" ? enforceRR({ entry_num: entry, sl_num: sl, confidence: 60, pattern: "Отскок от поддержки" }, true) : null,
-        sell: bias === "sell" ? enforceRR({ entry_num: entry, sl_num: sl, confidence: 60, pattern: "Отбой от сопротивления" }, false) : null,
-        market_regime: { type: "range", description: "Математический расчет без ИИ", score: 50 },
+        ...base,
+        market_regime: { type: regime === "range" ? "range" : "trend", subtype, description: `Цена ${fmt(p)} — ${bias === "buy" ? "ближе к поддержке" : "ближе к сопротивлению"} ${fmt(bias === "buy" ? nearSup : nearRes)}`, score: conf, dxy_bias: pair.includes("USD") ? "DXY — нейтральный (офлайн)" : "N/A" },
+        confidence: { score: conf, breakdown: { MTF: rndI(50,75), "Структура": rndI(50,75), "OB/FVG": rndI(45,70), "Новости": rndI(40,65), DXY: rndI(45,70) } },
         sr_levels:[
-          { type: "resistance", price: fmt(nearRes), price_num: nearRes, description: "Сопротивление" },
-          { type: "support", price: fmt(nearSup), price_num: nearSup, description: "Поддержка" }
-        ]
+          { type: "resistance", price: fmt(nearRes), price_num: nearRes, strength: 4, description: "Ближайшее круглое сопротивление" },
+          { type: "resistance", price: fmt(res2),    price_num: res2,    strength: 3, description: "Следующее сопротивление" },
+          { type: "support",    price: fmt(nearSup), price_num: nearSup, strength: 4, description: "Ближайшая круглая поддержка" },
+          { type: "support",    price: fmt(sup2),    price_num: sup2,    strength: 3, description: "Следующая поддержка" },
+        ],
+        ob_fvg: { bullish_ob:[{ high: parseFloat(fmt(nearSup + atr*0.5)), low: parseFloat(fmt(nearSup - atr*0.5)), strength: 3, description: "OB у поддержки" }], bearish_ob:[{ high: parseFloat(fmt(nearRes + atr*0.5)), low: parseFloat(fmt(nearRes - atr*0.5)), strength: 3, description: "OB у сопротивления" }], fvg_up: [], fvg_down:[] },
+        buy: { entry_zone: `${fmt(nearSup)}-${fmt(buyEntry)}`, entry_num: buyEntry, stop_loss: fmt(buySL), sl_num: buySL, sl_reasoning: "Ниже поддержки", tp1: fmt(buyTP1), tp1_num: buyTP1, tp2: fmt(buyTP2), tp2_num: buyTP2, confidence: buyConf, pattern: "Отбой от поддержки", reasoning: `Цена у уровня ${fmt(nearSup)}, потенциал до ${fmt(nearRes)}` },
+        sell: { entry_zone: `${fmt(sellEntry)}-${fmt(nearRes)}`, entry_num: sellEntry, stop_loss: fmt(sellSL), sl_num: sellSL, sl_reasoning: "Выше сопротивления", tp1: fmt(sellTP1), tp1_num: sellTP1, tp2: fmt(sellTP2), tp2_num: sellTP2, confidence: sellConf, pattern: "Отбой от сопротивления", reasoning: `Цена у уровня ${fmt(nearRes)}, потенциал до ${fmt(nearSup)}` },
+        mtf: { h1: { trend: bias === "buy" ? "bull" : "bear", structure: "Определяется по уровням", ema: "офлайн-режим" }, h4: { trend: bias === "buy" ? "bull" : "bear", structure: "Определяется по уровням", ema: "офлайн-режим" }, daily: { trend: "neutral", structure: "Нет данных", ema: "офлайн-режим" }, weekly: { trend: "neutral", structure: "Нет данных", ema: "офлайн-режим" }, signal: bias === "buy" ? "weak_buy" : "weak_sell", aligned: 2, signal_text: "Офлайн-режим: только уровневый анализ" },
+        news: { summary: "Офлайн-режим: нет данных по новостям", safe_window: "Проверь календарь вручную", events:[] },
+        tips: { best_session: session, confirmation: "Закрытие H1 свечи от уровня", avoid: "Входить без подтверждения и до выхода новостей", checklist:["Цена у OB/поддержки", "H1 свеча подтвердила", "Нет новостей 30 мин", "R:R от 2.2:1"], max_trades: "Максимум 2 сделки в день" },
+        no_trade: null,
       };
     }
 
-    // --- Промпт для ИИ ---
-    function buildPrompt(pair, dateStr, livePrice) {
-      return `Отвечай СТРОГО в формате JSON. Никакого лишнего текста.
-Пара: ${pair}. Текущая цена: ${livePrice || 'неизвестно'}. Дата: ${dateStr}.
-Ты - профессиональный трейдер. Проведи глубокий технический анализ.
-
-Сгенерируй JSON строго по этому шаблону:
-{
-  "mode": "deep",
-  "context": "Краткое описание ситуации на рынке на русском языке.",
-  "signal": "buy или sell или no_trade",
-  "confidence": 85,
-  "market_regime": { "type": "trend или range", "description": "описание" },
-  "sr_levels":[
-    {"type": "resistance", "price": "1.1050", "price_num": 1.1050, "description": "описание"},
-    {"type": "support", "price": "1.0950", "price_num": 1.0950, "description": "описание"}
-  ],
-  "buy": { "entry_num": 1.0960, "sl_num": 1.0930, "pattern": "пинбар/OB", "reasoning": "почему покупаем" },
-  "sell": { "entry_num": 1.1040, "sl_num": 1.1070, "pattern": "поглощение/OB", "reasoning": "почему продаем" },
-  "no_trade": null,
-  "news_risk": "low или medium или high"
-}`;
+    function offlineMultiAnalysis(pairs, prices) {
+      return pairs.map(pair => {
+        const r = offlineAnalysis(pair, prices[pair] || null, false);
+        return { pair, signal: r.signal, confidence: r.confidence, entry_num: r.entry_num, entry_zone: r.entry_zone, sl_num: r.sl_num, tp1_num: r.tp1_num, context: r.context, regime: r.regime, news_risk: r.news_risk, _offline: true };
+      });
     }
 
-    // --- Главный Компонент Приложения ---
-    function App() {
-      const[pair, setPair] = useState("EUR/USD");
-      const [loading, setLoading] = useState(false);
-      const [progress, setProgress] = useState(0);
-      const [loadingText, setLoadingText] = useState("");
-      
-      const [result, setResult] = useState(null);
-      const [error, setError] = useState(null);
-      const [clock, setClock] = useState(getMoscowTime());
+    // ─── PROMPTS ─────────────────────────────────────────────────────────────────
+    function buildDeepPrompt(pair, dateStr, timeStr, livePrice=null) {
+      const priceNote = livePrice ? `CURRENT LIVE PRICE: ${pair} = ${livePrice}. Use this exact price.` : `Use your best current knowledge for ${pair} price.`;
+      return `Respond ONLY with a raw JSON object. No markdown, no text outside JSON.\n\n${priceNote}\n\nYou are a senior Forex analyst. Date: ${dateStr}, ${timeStr} MSK. Pair: ${pair}.\n\nAnalyze: D1+H4+H1 structure, Order Block, FVG, liquidity zones, DXY (if USD pair), market regime.\nRules: entry only at OB/FVG/SR. SL behind invalidation. TP1>=2.2R, TP2>=3.2R. No setup→no_trade.\n\nJSON ONLY (no markdown). Fill with real analysis in Russian:\n{"mode":"deep","context":"цена+ситуация","market_regime":{"type":"trend","subtype":"bullish_trend","description":"кратко","score":70,"dxy_bias":"кратко"},"confidence":{"score":70,"breakdown":{"MTF":70,"Структура":70,"OB/FVG":70,"Новости":70,"DXY":70}},"sr_levels":[{"type":"resistance","price":"X","price_num":0,"strength":3,"description":"кратко"}],"ob_fvg":{"bullish_ob":[{"high":0,"low":0,"strength":3,"description":"кратко"}],"bearish_ob":[],"fvg_up":[],"fvg_down":[]},"buy":{"entry_zone":"X-Y","entry_num":0,"stop_loss":"X","sl_num":0,"sl_reasoning":"кратко","tp1":"X","tp1_num":0,"tp2":"X","tp2_num":0,"confidence":70,"pattern":"кратко","reasoning":"кратко"},"sell":{"entry_zone":"X-Y","entry_num":0,"stop_loss":"X","sl_num":0,"sl_reasoning":"кратко","tp1":"X","tp1_num":0,"tp2":"X","tp2_num":0,"confidence":50,"pattern":"кратко","reasoning":"кратко"},"mtf":{"h1":{"trend":"bull","structure":"кратко","ema":"кратко"},"h4":{"trend":"bull","structure":"кратко","ema":"кратко"},"daily":{"trend":"bull","structure":"кратко","ema":"кратко"},"weekly":{"trend":"bull","structure":"кратко","ema":"кратко"},"signal":"weak_buy","aligned":3,"signal_text":"кратко"},"news":{"summary":"кратко","safe_window":"HH:MM-HH:MM МСК","events":[]},"tips":{"best_session":"кратко","confirmation":"кратко","avoid":"кратко","checklist":["пункт"],"max_trades":"кратко"},"no_trade":null}`;
+    }
 
-      // Часы
-      useEffect(() => {
-        const iv = setInterval(() => setClock(getMoscowTime()), 1000);
-        return () => clearInterval(iv);
-      },[]);
+    function buildQuickPrompt(pair, dateStr, timeStr, livePrice=null) {
+      const priceNote = livePrice ? `CURRENT LIVE PRICE: ${pair} = ${livePrice}.` : `Use your best knowledge for ${pair} price.`;
+      return `Respond ONLY with raw JSON. No markdown.\n\n${priceNote} Date: ${dateStr}, ${timeStr} MSK. Pair: ${pair}.\n\nQuick Forex scan. Return JSON:\n{"mode":"quick","context":"string","signal":"buy|sell|no_trade","confidence":0-100,"entry_num":number,"entry_zone":"string","sl_num":number,"sl":"string","tp1_num":number,"tp1":"string","tp2_num":number,"tp2":"string","regime":"trend|range|pullback|expansion|compression|choppy","reason":"string","news_risk":"low|medium|high","no_trade_reason":null}`;
+    }
 
-      // Эффект прогресс-бара
-      useEffect(() => {
-        if (!loading) {
-          setProgress(0);
-          return;
-        }
-        const texts =[
-          "Подключение к серверам API...",
-          "Сбор котировок в реальном времени...",
-          "Запрос к нейросети Gemini...",
-          "Анализ структуры и уровней...",
-          "Формирование торгового плана..."
-        ];
-        let step = 0;
-        setLoadingText(texts[0]);
-        
-        const interval = setInterval(() => {
-          setProgress(p => {
-            const next = p + Math.random() * 15;
-            return next > 90 ? 90 : next; // Зависаем на 90%, пока не придет ответ
-          });
-          step++;
-          if (step % 3 === 0 && step / 3 < texts.length) {
-            setLoadingText(texts[step / 3]);
-          }
-        }, 600);
-        return () => clearInterval(interval);
-      }, [loading]);
+    function buildMultiPrompt(pairs, dateStr, timeStr, prices={}) {
+      const priceList = pairs.map(p=>`${p}=${prices[p]||"?"}`).join(", ");
+      return `Respond ONLY with a raw JSON array. No markdown.\n\nCURRENT LIVE PRICES: ${priceList}. Date: ${dateStr}, ${timeStr} MSK.\n\nQuick scan for ALL ${pairs.length} pairs. Return JSON array with one object per pair:\n[{"pair":"EUR/USD","signal":"buy|sell|no_trade","confidence":0-100,"entry_num":number,"entry_zone":"string|null","sl_num":number|null,"tp1_num":number|null,"context":"string","regime":"string","news_risk":"low|medium|high"}]`;
+    }
 
-      const startScan = async () => {
-        if (loading) return;
-        setLoading(true);
-        setError(null);
-        setResult(null);
-
-        try {
-          const now = new Date().toLocaleDateString("ru-RU");
-          
-          // 1. Получаем цены
-          setLoadingText("Получение котировок...");
-          const prices = await fetchLivePrices([pair]);
-          const currentPrice = prices[pair] || null;
-
-          // 2. Делаем запрос к Gemini
-          const prompt = buildPrompt(pair, now, currentPrice);
-          const requestBody = {
-            contents: [{ parts:[{ text: prompt }] }],
-            generationConfig: { responseMimeType: "application/json" }
-          };
-
-          // Вы можете поменять 1.5-flash на gemini-pro, если ключ не работает
-          const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(requestBody)
-          });
-
-          if (!res.ok) {
-          const errorText = await res.text();
-          throw new Error(`Ошибка от Google (Код ${res.status}): ${errorText}`);
-          }
-
-          const data = await res.json();
-          const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
-          
-          if (!rawText) throw new Error("Пустой ответ от ИИ");
-
-          let parsed = extractJSON(rawText);
-          
-          // Корректируем R:R математически
-          if (parsed.buy) parsed.buy = enforceRR(parsed.buy, true);
-          if (parsed.sell) parsed.sell = enforceRR(parsed.sell, false);
-          
-          setProgress(100);
-          setLoadingText("Анализ завершен!");
-          setTimeout(() => {
-            setResult(parsed);
-            setLoading(false);
-          }, 400);
-
-        } catch (err) {
-          console.warn("Сбой ИИ, переход в офлайн:", err);
-          // В случае ошибки показываем офлайн-расчет, чтобы приложение не висело
-          const fallback = offlineAnalysis(pair, 1.1000, true);
-          setProgress(100);
-          setTimeout(() => {
-            setResult(fallback);
-            setError(`Нейросеть недоступна (${err.message}). Показан математический расчет.`);
-            setLoading(false);
-          }, 400);
-        }
-      };
-
-      // РЕНДЕР ИНТЕРФЕЙСА
+    // ─── Компоненты UI ─────────────────────────────────────────────────────────────
+    function OBFVGChart({ obfvg, buy, sell }) { /* Тот же код */
+      const levels=[];
+      if(buy){levels.push(buy.sl_num,buy.entry_num,buy.tp1_num,buy.tp2_num);}
+      if(sell){levels.push(sell.sl_num,sell.entry_num,sell.tp1_num,sell.tp2_num);}
+      obfvg?.bullish_ob?.forEach(o=>{levels.push(o.high,o.low);});
+      obfvg?.bearish_ob?.forEach(o=>{levels.push(o.high,o.low);});
+      obfvg?.fvg_up?.forEach(f=>{levels.push(f.high,f.low);});
+      obfvg?.fvg_down?.forEach(f=>{levels.push(f.high,f.low);});
+      const valid=levels.filter(v=>v&&!isNaN(Number(v))&&Number(v)>0).map(Number);
+      if(valid.length<2) return null;
+      const mn=Math.min(...valid), mx=Math.max(...valid);
+      const pad=(mx-mn)*0.08;
+      const minP=mn-pad, maxP=mx+pad, range=maxP-minP||0.001;
+      const W=300,H=180;
+      const toY=v=>H-((Number(v)-minP)/range)*H;
+      const isBuyPrimary=!sell||(buy&&sell&&(buy.confidence||0)>=(sell.confidence||0));
+      const primary=isBuyPrimary?buy:sell;
+      const pColor=isBuyPrimary?"#22cc88":"#ff5566";
       return (
-        <div>
-          {/* Верхняя панель */}
-          <div style={{ position: "sticky", top: 0, zIndex: 100, background: "rgba(11, 17, 32, 0.95)", backdropFilter: "blur(10px)", borderBottom: "1px solid var(--border-color)", padding: "12px 16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <div>
-              <div style={{ fontWeight: 700, color: "var(--text-main)", fontSize: "16px" }}>
-                FX AI <span style={{ color: "var(--color-buy)" }}>Сканнер</span>
-              </div>
-              <div style={{ fontSize: "10px", color: "var(--text-muted)" }}>Gemini Pro Engine</div>
-            </div>
-            <div className="mono" style={{ fontWeight: 700, fontSize: "14px", color: "var(--color-info)" }}>
-              {clock} МСК
-            </div>
-          </div>
-
-          <div style={{ padding: "16px", paddingBottom: "100px" }}>
-            
-            {/* Выбор пары */}
-            <div style={{ marginBottom: "20px" }}>
-              <div style={{ fontSize: "12px", color: "var(--text-muted)", marginBottom: "8px", fontWeight: 600 }}>ВЫБЕРИТЕ ПАРУ:</div>
-              <div style={{ display: "flex", gap: "8px", overflowX: "auto", paddingBottom: "8px" }}>
-                {PAIRS.map(p => (
-                  <button 
-                    key={p} 
-                    onClick={() => { setPair(p); setResult(null); setError(null); }}
-                    style={{
-                      flexShrink: 0,
-                      background: p === pair ? "var(--color-buy-bg)" : "var(--bg-card)",
-                      border: `1px solid ${p === pair ? "var(--color-buy)" : "var(--border-color)"}`,
-                      color: p === pair ? "var(--color-buy)" : "var(--text-main)",
-                      padding: "10px 16px",
-                      borderRadius: "12px",
-                      fontWeight: 600,
-                      fontSize: "14px"
-                    }}
-                  >
-                    {p}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Блок загрузки (Прогресс бар) */}
-            {loading && (
-              <div className="card" style={{ textAlign: "center", padding: "30px 20px" }}>
-                <div style={{ fontSize: "24px", marginBottom: "12px", animation: "pulse 1.5s infinite" }}>🤖</div>
-                <div style={{ fontWeight: 600, color: "var(--color-info)", marginBottom: "8px" }}>Анализирую {pair}...</div>
-                <div style={{ fontSize: "12px", color: "var(--text-muted)", height: "16px" }}>{loadingText}</div>
-                <div className="progress-bar-container">
-                  <div className="progress-bar-fill" style={{ width: `${progress}%` }}></div>
-                </div>
-              </div>
-            )}
-
-            {/* Вывод ошибки */}
-            {error && !loading && (
-              <div style={{ background: "var(--color-sell-bg)", border: "1px solid var(--color-sell)", padding: "12px", borderRadius: "12px", color: "#FCA5A5", fontSize: "12px", marginBottom: "16px", lineHeight: 1.5 }}>
-                {error}
-                <br/>💡 Убедитесь, что ваш VPN включен и ключ Gemini верен.
-              </div>
-            )}
-
-            {/* Вывод результата */}
-            {result && !loading && (
-              <div>
-                <div className="card">
-                  <div style={{ fontSize: "11px", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "1px", marginBottom: "8px" }}>Сводка ИИ</div>
-                  <div style={{ fontSize: "14px", lineHeight: 1.6, color: "var(--text-main)" }}>
-                    {result.context}
-                  </div>
-                </div>
-
-                {result.buy && (
-                  <div className="card" style={{ borderLeft: "4px solid var(--color-buy)" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
-                      <div style={{ fontWeight: 700, color: "var(--color-buy)", fontSize: "16px" }}>🟢 ПОКУПКА (BUY)</div>
-                      <div className="mono" style={{ background: "var(--color-buy-bg)", color: "var(--color-buy)", padding: "4px 8px", borderRadius: "6px", fontSize: "12px", fontWeight: 700 }}>
-                        ВХОД: {result.buy.entry_num || result.buy.entry_zone}
-                      </div>
-                    </div>
-                    
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "16px" }}>
-                      <div style={{ background: "rgba(0,0,0,0.2)", padding: "10px", borderRadius: "8px" }}>
-                        <div style={{ fontSize: "10px", color: "var(--text-muted)", marginBottom: "4px" }}>STOP LOSS</div>
-                        <div className="mono" style={{ color: "var(--color-sell)", fontWeight: 700, fontSize: "15px" }}>{result.buy.sl_num || result.buy.sl}</div>
-                      </div>
-                      <div style={{ background: "rgba(0,0,0,0.2)", padding: "10px", borderRadius: "8px" }}>
-                        <div style={{ fontSize: "10px", color: "var(--text-muted)", marginBottom: "4px" }}>TAKE PROFIT 1</div>
-                        <div className="mono" style={{ color: "var(--color-buy)", fontWeight: 700, fontSize: "15px" }}>{result.buy.tp1_num || result.buy.tp1}</div>
-                      </div>
-                    </div>
-                    
-                    <div style={{ fontSize: "12px", color: "var(--text-muted)", borderTop: "1px solid var(--border-color)", paddingTop: "12px" }}>
-                      <strong>Обоснование:</strong> {result.buy.reasoning || "Алгоритмический расчет от уровней."}
-                    </div>
-                  </div>
-                )}
-
-                {result.sell && (
-                  <div className="card" style={{ borderLeft: "4px solid var(--color-sell)" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
-                      <div style={{ fontWeight: 700, color: "var(--color-sell)", fontSize: "16px" }}>🔴 ПРОДАЖА (SELL)</div>
-                      <div className="mono" style={{ background: "var(--color-sell-bg)", color: "var(--color-sell)", padding: "4px 8px", borderRadius: "6px", fontSize: "12px", fontWeight: 700 }}>
-                        ВХОД: {result.sell.entry_num || result.sell.entry_zone}
-                      </div>
-                    </div>
-                    
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "16px" }}>
-                      <div style={{ background: "rgba(0,0,0,0.2)", padding: "10px", borderRadius: "8px" }}>
-                        <div style={{ fontSize: "10px", color: "var(--text-muted)", marginBottom: "4px" }}>STOP LOSS</div>
-                        <div className="mono" style={{ color: "var(--color-sell)", fontWeight: 700, fontSize: "15px" }}>{result.sell.sl_num || result.sell.sl}</div>
-                      </div>
-                      <div style={{ background: "rgba(0,0,0,0.2)", padding: "10px", borderRadius: "8px" }}>
-                        <div style={{ fontSize: "10px", color: "var(--text-muted)", marginBottom: "4px" }}>TAKE PROFIT 1</div>
-                        <div className="mono" style={{ color: "var(--color-buy)", fontWeight: 700, fontSize: "15px" }}>{result.sell.tp1_num || result.sell.tp1}</div>
-                      </div>
-                    </div>
-                    
-                    <div style={{ fontSize: "12px", color: "var(--text-muted)", borderTop: "1px solid var(--border-color)", paddingTop: "12px" }}>
-                      <strong>Обоснование:</strong> {result.sell.reasoning || "Алгоритмический расчет от уровней."}
-                    </div>
-                  </div>
-                )}
-
-                {result.sr_levels && result.sr_levels.length > 0 && (
-                  <div className="card">
-                    <div style={{ fontSize: "11px", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "1px", marginBottom: "12px" }}>Ключевые уровни</div>
-                    {result.sr_levels.map((lvl, idx) => (
-                      <div key={idx} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: idx !== result.sr_levels.length - 1 ? "1px solid var(--border-color)" : "none" }}>
-                        <div style={{ fontSize: "12px", color: lvl.type === "support" ? "var(--color-buy)" : "var(--color-sell)", fontWeight: 600 }}>
-                          {lvl.type === "support" ? "ПОДДЕРЖКА" : "СОПРОТИВЛЕНИЕ"}
-                        </div>
-                        <div className="mono" style={{ fontSize: "13px", fontWeight: 700 }}>{lvl.price}</div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-              </div>
-            )}
-
-            {/* Приветственный экран (пока не нажали кнопку) */}
-            {!result && !loading && !error && (
-               <div className="card" style={{ textAlign: "center", padding: "40px 20px", background: "transparent", border: "1px dashed var(--border-color)" }}>
-                 <div style={{ fontSize: "40px", opacity: 0.5, marginBottom: "16px" }}>⚡</div>
-                 <div style={{ fontWeight: 600, color: "var(--text-main)", marginBottom: "8px" }}>Сканнер готов к работе</div>
-                 <div style={{ fontSize: "13px", color: "var(--text-muted)", lineHeight: 1.5 }}>
-                   Нажмите кнопку ниже, чтобы запустить глубокий анализ структуры рынка, объемов и уровней для выбранной пары.
-                 </div>
-               </div>
-            )}
-
-          </div>
-
-          {/* Нижняя фиксированная кнопка */}
-          <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, padding: "16px", background: "rgba(11, 17, 32, 0.95)", backdropFilter: "blur(10px)", borderTop: "1px solid var(--border-color)" }}>
-            <button 
-              onClick={startScan} 
-              disabled={loading}
-              style={{
-                width: "100%",
-                padding: "16px",
-                background: loading ? "var(--bg-hover)" : "var(--color-buy)",
-                color: loading ? "var(--text-muted)" : "#fff",
-                border: "none",
-                borderRadius: "12px",
-                fontSize: "16px",
-                fontWeight: 700,
-                boxShadow: loading ? "none" : "0 4px 14px rgba(16, 185, 129, 0.4)"
-              }}
-            >
-              {loading ? "ИДЕТ АНАЛИЗ..." : `🚀 СКАНИРОВАТЬ ${pair}`}
-            </button>
+        <div style={{background:"rgba(10,16,26,.95)",border:"1px solid rgba(100,160,220,.18)",borderRadius:12,padding:"12px 14px",marginBottom:12}}>
+          <div style={{fontFamily:"'Courier New',monospace",fontSize:10,color:"#aabbdd",letterSpacing:"2px",marginBottom:10,fontWeight:700}}>КАРТА ЗОН · ORDER BLOCK / FVG / УРОВНИ</div>
+          <div style={{overflowX:"auto"}}>
+          <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{overflow:"visible",display:"block",minWidth:260}}>
+            {[0,.25,.5,.75,1].map(t=>( <line key={t} x1={32} y1={H*t} x2={W} y2={H*t} stroke="rgba(255,255,255,.05)" strokeWidth="0.5"/> ))}
+            {obfvg?.bullish_ob?.map((ob,i)=>{
+              const y1=toY(ob.high),y2=toY(ob.low),h=Math.max(3,y2-y1);
+              return <g key={`bob${i}`}><rect x={32} y={y1} width={W-32} height={h} fill="rgba(34,204,136,.16)" stroke="rgba(34,204,136,.6)" strokeWidth="1" strokeDasharray="4,2"/><text x={34} y={y1-2} fill="rgba(68,220,150,.9)" fontSize="7.5" fontFamily="Courier New,monospace" fontWeight="bold">OB↑</text></g>;
+            })}
+            {obfvg?.bearish_ob?.map((ob,i)=>{
+              const y1=toY(ob.high),y2=toY(ob.low),h=Math.max(3,y2-y1);
+              return <g key={`seob${i}`}><rect x={32} y={y1} width={W-32} height={h} fill="rgba(255,68,85,.16)" stroke="rgba(255,68,85,.6)" strokeWidth="1" strokeDasharray="4,2"/><text x={34} y={y1-2} fill="rgba(255,100,120,.9)" fontSize="7.5" fontFamily="Courier New,monospace" fontWeight="bold">OB↓</text></g>;
+            })}
+            {obfvg?.fvg_up?.map((fvg,i)=>{
+              const y1=toY(fvg.high),y2=toY(fvg.low),h=Math.max(2,y2-y1);
+              return <rect key={`fvgu${i}`} x={32} y={y1} width={W-32} height={h} fill="rgba(34,204,136,.1)" stroke="rgba(34,204,136,.32)" strokeWidth="0.8"/>;
+            })}
+            {obfvg?.fvg_down?.map((fvg,i)=>{
+              const y1=toY(fvg.high),y2=toY(fvg.low),h=Math.max(2,y2-y1);
+              return <rect key={`fvgd${i}`} x={32} y={y1} width={W-32} height={h} fill="rgba(255,68,85,.1)" stroke="rgba(255,68,85,.32)" strokeWidth="0.8"/>;
+            })}
+            {primary &&[ {v:primary.sl_num,c:"#ff6677",l:"SL",d:"4,3"}, {v:primary.entry_num,c:"#f0d060",l:"ENTRY",d:"none"}, {v:primary.tp1_num,c:"#22dd88",l:"TP1",d:"4,3"}, primary.tp2_num&&{v:primary.tp2_num,c:"#55ffcc",l:"TP2",d:"4,3"} ].filter(Boolean).map(({v,c,l,d})=>(
+              <g key={l}><line x1={32} y1={toY(v)} x2={W} y2={toY(v)} stroke={c} strokeWidth={l==="ENTRY"?2:1.2} strokeDasharray={d}/><text x={30} y={toY(v)+3.5} textAnchor="end" fill={c} fontSize="8" fontFamily="Courier New,monospace" fontWeight="bold">{l}</text></g>
+            ))}
+            {primary?.entry_num&&primary?.sl_num&&( <rect x={32} y={Math.min(toY(primary.entry_num),toY(primary.sl_num))-1} width={W-32} height={Math.abs(toY(primary.entry_num)-toY(primary.sl_num))+2} fill={`${pColor}09`}/> )}
+            {[0,.25,.5,.75,1].map(t=>{
+              const price=(maxP-t*range); const digits=price>10?2:price>1?4:5;
+              return <text key={t} x={30} y={H*t+3} textAnchor="end" fill="rgba(180,210,250,.75)" fontSize="7" fontFamily="Courier New,monospace">{price.toFixed(digits)}</text>;
+            })}
+          </svg>
           </div>
         </div>
       );
     }
 
-    // Рендер приложения
+    function MarketRegimeCard({ regime }) {
+      if(!regime) return null;
+      const TYPES={ trend:{icon:"📈",c:"#22cc88",l:"ТРЕНД"},bullish_trend:{icon:"📈",c:"#22cc88",l:"БЫЧИЙ ТРЕНД"}, bearish_trend:{icon:"📉",c:"#ff5566",l:"МЕДВЕЖИЙ ТРЕНД"},range:{icon:"↔",c:"#7fb3e0",l:"ДИАПАЗОН"}, pullback:{icon:"↩",c:"#e8c94a",l:"КОРРЕКЦИЯ"},expansion:{icon:"⚡",c:"#ff9944",l:"ЭКСПАНСИЯ"}, compression:{icon:"▣",c:"#8899aa",l:"КОМПРЕССИЯ"},choppy:{icon:"⚠",c:"#ff5566",l:"ХАОТИЧНЫЙ"} };
+      const r=TYPES[regime.subtype]||TYPES[regime.type]||{icon:"◆",c:"#8899aa",l:(regime.type||"").toUpperCase()};
+      const score=Math.min(100,Math.max(0,Number(regime.score)||50));
+      return (
+        <div style={{background:"rgba(12,18,28,.9)",border:`1px solid ${r.c}30`,borderRadius:12,padding:"12px 14px",marginBottom:12}}>
+          <div style={{fontFamily:"'Courier New',monospace",fontSize:10,color:"#aabbdd",letterSpacing:"2px",marginBottom:10,fontWeight:700}}>РЕЖИМ РЫНКА</div>
+          <div style={{display:"flex",alignItems:"center",gap:14}}>
+            <div style={{fontSize:24,flexShrink:0}}>{r.icon}</div>
+            <div style={{flex:1}}>
+              <div style={{fontFamily:"'Courier New',monospace",fontSize:13,fontWeight:700,color:r.c,marginBottom:5}}>{r.l} · {score}</div>
+              <div style={{fontSize:11,color:"#ccdde8",lineHeight:1.5}}>{regime.description}</div>
+              {regime.dxy_bias&&<div style={{marginTop:5,fontFamily:"'Courier New',monospace",fontSize:10,color:"#ccdde8"}}>DXY: {regime.dxy_bias}</div>}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    function NoTradeCard({ noTrade }) {
+      if(!noTrade) return null;
+      return (
+        <div style={{background:"rgba(12,18,28,.95)",border:"2px solid rgba(240,208,96,.28)",borderRadius:14,padding:"20px 16px",marginBottom:12,textAlign:"center"}}>
+          <div style={{fontSize:34,marginBottom:8}}>🚫</div>
+          <div style={{fontFamily:"'Courier New',monospace",fontSize:15,fontWeight:700,color:"#f0d060",letterSpacing:3,marginBottom:10}}>NO TRADE</div>
+          <div style={{fontSize:12,color:"#ccdde8",lineHeight:1.6,marginBottom:12}}>{noTrade.reason}</div>
+        </div>
+      );
+    }
+
+    function Scale({ sl, entry, tp1, tp2 }) {
+      const nums=[sl,entry,tp1,tp2].filter(Boolean).map(Number);
+      if(nums.length<2) return null;
+      const mn=Math.min(...nums),mx=Math.max(...nums),range=mx-mn||0.001;
+      const pos=v=>8+((v-mn)/range)*84;
+      const markers=[ {v:sl,l:"SL",c:"#ff6677",h:18},{v:entry,l:"ENTRY",c:"#f0d060",h:26}, {v:tp1,l:"TP1",c:"#22dd88",h:18},tp2&&{v:tp2,l:"TP2",c:"#55ffcc",h:18} ].filter(Boolean);
+      return (
+        <div style={{position:"relative",height:60,margin:"4px 0 10px"}}>
+          <div style={{position:"absolute",top:"50%",left:"8%",right:"8%",height:1,background:"rgba(255,255,255,.08)"}}/>
+          {markers.map(m=>(
+            <div key={m.l} style={{position:"absolute",left:`${pos(m.v)}%`,top:0,bottom:0,transform:"translateX(-50%)",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:1}}>
+              <span style={{fontFamily:"'Courier New',monospace",fontSize:9,color:m.c,whiteSpace:"nowrap",fontWeight:700}}>{m.l}</span>
+              <div style={{width:2,height:m.h,background:m.c,borderRadius:2}}/>
+              <span style={{fontFamily:"'Courier New',monospace",fontSize:8,color:m.c,whiteSpace:"nowrap"}}>{Number(m.v).toFixed(4)}</span>
+            </div>
+          ))}
+        </div>
+      );
+    }
+
+    function ConfidenceMeter({ score, breakdown }) {
+      if(!score) return null;
+      const pct=Math.min(100,Math.max(0,Number(score)));
+      const c=pct>=75?"#22cc88":pct>=55?"#f0d060":"#ff5566";
+      const lbl=pct>=75?"ВЫСОКАЯ":pct>=55?"СРЕДНЯЯ":"НИЗКАЯ";
+      return (
+        <div style={{background:"rgba(12,18,28,.9)",border:`1px solid ${c}28`,borderRadius:12,padding:"12px 14px",marginBottom:12}}>
+          <div style={{fontFamily:"'Courier New',monospace",fontSize:10,color:"#aabbdd",letterSpacing:"2px",marginBottom:10,fontWeight:700}}>AI УВЕРЕННОСТЬ В СИГНАЛЕ</div>
+          <div style={{display:"flex",alignItems:"center",gap:16}}>
+            <div style={{flex:1}}>
+              <div style={{fontFamily:"'Courier New',monospace",fontSize:12,fontWeight:700,color:c,marginBottom:7}}>УВЕРЕННОСТЬ: {lbl} ({pct}%)</div>
+              {breakdown&&Object.entries(breakdown).map(([k,v])=>(
+                <div key={k} style={{display:"flex",alignItems:"center",gap:7,marginBottom:5}}>
+                  <div style={{fontFamily:"'Courier New',monospace",fontSize:10,color:"#aabbdd",width:80,flexShrink:0}}>{k}</div>
+                  <div style={{flex:1,height:3,borderRadius:2,background:"rgba(255,255,255,.07)",overflow:"hidden"}}><div style={{height:"100%",width:`${v}%`,background:`linear-gradient(90deg,${c}88,${c})`}}/></div>
+                  <div style={{fontFamily:"'Courier New',monospace",fontSize:10,color:"#ccdde8",width:28,textAlign:"right"}}>{v}%</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    function SRLevelsCard({ levels, currentPrice }) {
+      if(!levels||!levels.length) return null;
+      const sorted=[...levels].sort((a,b)=>Number(b.price_num)-Number(a.price_num));
+      const cp=Number(currentPrice);
+      return (
+        <div style={{background:"rgba(12,18,28,.9)",border:"1px solid rgba(100,160,220,.18)",borderRadius:12,padding:"12px 14px",marginBottom:12}}>
+          <div style={{fontFamily:"'Courier New',monospace",fontSize:10,color:"#aabbdd",letterSpacing:"2px",marginBottom:10,fontWeight:700}}>КЛЮЧЕВЫЕ УРОВНИ PRICE ACTION</div>
+          <div style={{display:"flex",flexDirection:"column",gap:5}}>
+            {sorted.map((lvl,i)=>{
+              const tc=lvl.type==="resistance"?"#ff6677":"#22dd88";
+              const isAbove=cp&&Number(lvl.price_num)>cp, isBelow=cp&&Number(lvl.price_num)<cp;
+              return (
+                <div key={i} style={{display:"flex",alignItems:"center",gap:8,padding:"7px 10px",borderRadius:8,background:"rgba(17,29,42,.7)",border:`1px solid ${tc}1e`}}>
+                  <div style={{width:38,fontFamily:"'Courier New',monospace",fontSize:10,fontWeight:700,color:tc}}>{lvl.type==="resistance"?"СОПР":"ПОДД"}</div>
+                  <div style={{fontFamily:"'Courier New',monospace",fontSize:14,fontWeight:700,color:isAbove?"#ff8899":isBelow?"#44eebb":"#f0d060",flex:1}}>{lvl.price}</div>
+                  <div style={{fontSize:10,color:"#ccdde8",textAlign:"right",maxWidth:100}}>{lvl.description}</div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      );
+    }
+
+    function NewsCard({ news }) {
+      if(!news||!news.events||!news.events.length) return null;
+      const ic=i=>i==="high"?"#ff6677":i==="medium"?"#f0d060":"#7799aa";
+      return (
+        <div style={{background:"rgba(14,20,32,.95)",border:"1px solid rgba(232,201,74,.18)",borderRadius:12,padding:"12px 14px",marginBottom:12}}>
+          <div style={{fontFamily:"'Courier New',monospace",fontSize:10,color:"#aabbdd",letterSpacing:"2px",marginBottom:4,fontWeight:600}}>ЭКОНОМИЧЕСКИЙ КАЛЕНДАРЬ</div>
+          <div style={{fontSize:11,color:"#ccdde8",marginBottom:10,lineHeight:1.5}}>{news.summary}</div>
+        </div>
+      );
+    }
+
+    function MTFCard({ mtf }) {
+      if(!mtf) return null;
+      return (
+        <div style={{background:"rgba(12,18,28,.9)",border:"1px solid rgba(100,160,220,.18)",borderRadius:12,padding:14,marginBottom:12}}>
+          <div style={{fontFamily:"'Courier New',monospace",fontSize:10,color:"#aabbdd",letterSpacing:"2px",marginBottom:10,fontWeight:700}}>МУЛЬТИТАЙМФРЕЙМНЫЙ АНАЛИЗ (H1·H4·D1)</div>
+          <div style={{fontFamily:"'Courier New',monospace",fontSize:12,color:"#22cc88"}}>{mtf.signal_text}</div>
+        </div>
+      );
+    }
+
+    function SetupCard({ data, isBuy, onAddAlert, pair }) {
+      if(!data) return null;
+      const accent=isBuy?"#22dd88":"#ff6677";
+      const bg=isBuy?"rgba(6,18,14,.97)":"rgba(20,6,8,.97)";
+      const rr=data.entry_num&&data.sl_num&&data.tp1_num ?(Math.abs(data.tp1_num-data.entry_num)/Math.abs(data.entry_num-data.sl_num)).toFixed(2):"—";
+      return (
+        <div style={{background:bg,border:`1.5px solid ${accent}66`,borderRadius:14,padding:"16px 14px",marginBottom:12}}>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}>
+            <div style={{fontFamily:"'Courier New',monospace",fontSize:14,fontWeight:700,letterSpacing:2,color:accent}}>{isBuy?"▲ BUY LIMIT":"▼ SELL LIMIT"}</div>
+            <div style={{background:"rgba(240,208,96,.1)",border:"1px solid rgba(240,208,96,.35)",borderRadius:20,padding:"4px 10px",fontFamily:"'Courier New',monospace",fontSize:12,color:"#f0d060",fontWeight:700}}>R:R {rr}</div>
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"11px 14px",marginBottom:10}}>
+            {[{label:"ВХОД",val:data.entry_zone,color:"#f0d060"}, {label:"SL",val:data.stop_loss||data.sl,color:"#ff7788"}, {label:"TP1",val:data.tp1,color:"#22dd88"}, data.tp2&&{label:"TP2",val:data.tp2,color:"#55ffcc"}].filter(Boolean).map(item=>(
+              <div key={item.label}>
+                <div style={{fontFamily:"'Courier New',monospace",fontSize:9,color:"#bbddee",marginBottom:3,fontWeight:600}}>{item.label}</div>
+                <div style={{fontFamily:"'Courier New',monospace",fontSize:18,fontWeight:700,color:item.color}}>{item.val}</div>
+              </div>
+            ))}
+          </div>
+          <Scale sl={data.sl_num} entry={data.entry_num} tp1={data.tp1_num} tp2={data.tp2_num}/>
+          {data.reasoning&&<div style={{fontSize:11,color:"#ccdde8",lineHeight:1.6,paddingTop:8}}>{data.reasoning}</div>}
+          {onAddAlert&&( <button onClick={()=>onAddAlert({pair,direction:isBuy?"buy":"sell",zone:data.entry_zone,entry_num:data.entry_num})} style={{width:"100%",padding:"10px",background:"rgba(240,208,96,.07)",border:"1px solid rgba(240,208,96,.25)",borderRadius:8,fontFamily:"'Courier New',monospace",fontSize:11,color:"#f0d060",cursor:"pointer",marginTop:10}}>🔔 ДОБАВИТЬ АЛЕРТ</button> )}
+        </div>
+      );
+    }
+
+    function TipsCard({ tips }) { return null; /* Минимальный UI */ }
+
+    function QuickSignalCard({ data, onDeepScan }) {
+      if(!data) return null;
+      const sc=data.signal==="buy"?"#22dd88":data.signal==="sell"?"#ff6677":"#f0d060";
+      return (
+        <div style={{background:"rgba(10,16,26,.98)",border:`1px solid ${sc}32`,borderRadius:12,padding:12,marginBottom:8}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:6}}>
+            <div style={{fontFamily:"'Courier New',monospace",fontSize:13,fontWeight:700,color:"#eef5ff"}}>{data.pair}</div>
+            <div style={{fontFamily:"'Courier New',monospace",fontSize:10,fontWeight:700,color:sc}}>{data.signal.toUpperCase()}</div>
+          </div>
+          <div style={{fontSize:10,color:"#ccdde8",marginBottom:8}}>{data.context}</div>
+          <button onClick={()=>onDeepScan&&onDeepScan(data.pair)} style={{width:"100%",padding:"6px",background:"rgba(34,204,136,.1)",border:"1px solid rgba(34,204,136,.28)",borderRadius:6,fontFamily:"'Courier New',monospace",fontSize:10,color:"#22dd88",cursor:"pointer"}}>🔬 Глубокий анализ</button>
+        </div>
+      );
+    }
+
+    // ─── Main App ─────────────────────────────────────────────────────────────────
+    function App() {
+      const [pair,setPair]           = useState("EUR/USD");
+      const[loading,setLoading]     = useState(false);
+      const [result,setResult]       = useState(null);
+      const [error,setError]         = useState(null);
+      const[scanTime,setScanTime]   = useState(null);
+      const [dots,setDots]           = useState(0);
+      const [clock,setClock]         = useState(getMoscowTime());
+      const [session,setSession]     = useState(getSession());
+      const [history,setHistory]     = useState([]);
+      const[tab,setTab]             = useState("scan");
+      const [mode,setMode]           = useState("deep");
+      const [alerts,setAlerts]       = useState([]);
+      const [multiResults,setMultiResults] = useState([]);
+      const [multiLoading,setMultiLoading] = useState(false);
+      const [livePrice,setLivePrice]   = useState(null);
+      const [apiKey, setApiKey]        = useState(() => localStorage.getItem("fxsp_apikey") || "");
+      const pairRef=useRef(pair);
+      pairRef.current=pair;
+
+      useEffect(()=>{const iv=setInterval(()=>{setClock(getMoscowTime());setSession(getSession());},1000);return()=>clearInterval(iv);},[]);
+      useEffect(()=>{ if(loading){ const i1=setInterval(()=>setDots(d=>(d+1)%4),380); return()=>clearInterval(i1); } },[loading]);
+
+      useEffect(()=>{
+        try{const r=localStorage.getItem("fxsp_history");if(r)setHistory(JSON.parse(r));}catch(_){}
+        try{const r=localStorage.getItem("fxsp_alerts");if(r)setAlerts(JSON.parse(r));}catch(_){}
+      },[]);
+
+      const saveHistory=h=>{setHistory(h);try{localStorage.setItem("fxsp_history",JSON.stringify(h));}catch(_){}};
+      const saveAlerts=a=>{setAlerts(a);try{localStorage.setItem("fxsp_alerts",JSON.stringify(a));}catch(_){}};
+      const saveApiKey=k=>{setApiKey(k);try{localStorage.setItem("fxsp_apikey",k);}catch(_){}};
+
+      const doFetch=async(prompt,tokens=2000,parseAsArray=false)=>{
+        if(!apiKey) throw new Error("Укажите Anthropic API Key (sk-ant-...) в поле выше!");
+        const controller=new AbortController();
+        const timer=setTimeout(()=>controller.abort(),25000);
+        try{
+          const res=await fetch("https://api.anthropic.com/v1/messages",{
+            signal:controller.signal,
+            method:"POST",
+            headers:{
+              "Content-Type":"application/json",
+              "x-api-key": apiKey,
+              "anthropic-version": "2023-06-01",
+              "anthropic-dangerously-allow-browser": "true" // Включаем возможность делать запросы из браузера
+            },
+            body:JSON.stringify({model:"claude-3-5-haiku-20241022",max_tokens:tokens,messages:[{role:"user",content:prompt}]})
+          });
+          if(!res.ok){ const txt=await res.text(); throw new Error(`HTTP ${res.status}: ${txt.slice(0,100)}`); }
+          const data=await res.json();
+          if(data.error) throw new Error(data.error.message||JSON.stringify(data.error));
+          const raw=(data.content||[]).map(b=>b.type==="text"?b.text:"").join("").trim();
+          return parseAsArray ? extractJSONArray(raw) : extractJSON(raw);
+        }catch(e){
+          if(e.name==="AbortError") throw new Error("Таймаут. Попробуйте ещё раз.");
+          throw e;
+        }finally{clearTimeout(timer);}
+      };
+
+      const scan=async()=>{
+        if(loading) return;
+        setLoading(true);setError(null);setResult(null);setTab("scan");
+        try{
+          const now=new Date();
+          const dateStr=now.toLocaleDateString("ru-RU",{weekday:"long",year:"numeric",month:"long",day:"numeric"});
+          const timeStr=now.toLocaleTimeString("ru-RU",{hour:"2-digit",minute:"2-digit",timeZone:"Europe/Moscow"});
+          const prices=await fetchLivePrices([pairRef.current]);
+          const fetchedPrice=prices[pairRef.current]||null;
+          setLivePrice(fetchedPrice);
+          
+          let parsed = null;
+          try {
+            const prompt=mode==="deep"?buildDeepPrompt(pairRef.current,dateStr,timeStr,fetchedPrice):buildQuickPrompt(pairRef.current,dateStr,timeStr,fetchedPrice);
+            parsed = await doFetch(prompt, mode==="deep" ? 1800 : 1000);
+          } catch(aiErr) {
+            console.warn("AI недоступен:", aiErr.message);
+            parsed = offlineAnalysis(pairRef.current, fetchedPrice, mode==="deep");
+            setError(aiErr.message.includes("API Key") ? aiErr.message : "⚠ AI недоступен — показан технический анализ (офлайн)");
+          }
+          if(!parsed) throw new Error("Нет ответа.");
+          if(parsed.buy) parsed.buy=enforceRR(parsed.buy,true);
+          if(parsed.sell) parsed.sell=enforceRR(parsed.sell,false);
+          setResult(parsed);
+          const t=new Date().toLocaleTimeString("ru-RU",{hour:"2-digit",minute:"2-digit",second:"2-digit"});
+          setScanTime(t);
+          saveHistory([{pair:pairRef.current,time:t,mode,result:parsed},...history].slice(0,20));
+        }catch(e){ setError(e.message||"Ошибка. Попробуйте ещё раз."); }
+        finally{ setLoading(false); }
+      };
+
+      const scanAll=async()=>{
+        if(multiLoading) return;
+        setMultiLoading(true);setMultiResults([]);setTab("multi");
+        try{
+          const now=new Date();
+          const dateStr=now.toLocaleDateString("ru-RU",{weekday:"long",year:"numeric",month:"long",day:"numeric"});
+          const timeStr=now.toLocaleTimeString("ru-RU",{hour:"2-digit",minute:"2-digit",timeZone:"Europe/Moscow"});
+          const livePrices=await fetchLivePrices(PAIRS);
+          let res1=[];
+          try {
+            const r1=await doFetch(buildMultiPrompt(PAIRS,dateStr,timeStr,livePrices),1500,true);
+            res1=Array.isArray(r1)?r1.map((d,i)=>({...d,pair:d.pair||PAIRS[i]})):[];
+          } catch(e) { res1=offlineMultiAnalysis(PAIRS,livePrices); }
+          setMultiResults(res1);
+        }catch(e){ setError(e.message||"Ошибка мульти-скана."); }
+        finally{ setMultiLoading(false); }
+      };
+
+      const mapQuickToSetup=r=>r.signal==="no_trade"?null:{ entry_zone:r.entry_zone,entry_num:r.entry_num,stop_loss:r.sl,sl_num:r.sl_num, tp1:r.tp1,tp1_num:r.tp1_num,tp2:r.tp2,tp2_num:r.tp2_num,confidence:r.confidence,reasoning:r.reason };
+      const addAlert=async a=>saveAlerts([a,...alerts].slice(0,10));
+      const deepScanFromMulti=p=>{setPair(p);pairRef.current=p;setMode("deep");setTab("scan");setResult(null);};
+
+      return (
+        <div style={{minHeight:"100vh",color:"#ccdde8",fontFamily:"system-ui,sans-serif",paddingBottom:100}}>
+          {/* Header */}
+          <div style={{background:"rgba(6,12,20,.98)",borderBottom:"1px solid rgba(100,160,220,.14)",padding:"10px 14px"}}>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
+              <div style={{fontFamily:"'Courier New',monospace",fontSize:14,color:"#eef5ff",fontWeight:700}}>FX SCANNER PRO</div>
+              <div style={{fontFamily:"'Courier New',monospace",fontSize:12,color:"#eef5ff",fontWeight:700}}>{clock}</div>
+            </div>
+            {/* Настройки ключа API */}
+            <input 
+              type="password" 
+              placeholder="Вставьте Anthropic API Key (sk-ant-...)" 
+              value={apiKey} 
+              onChange={e=>saveApiKey(e.target.value)}
+              style={{width:"100%", background:"rgba(255,255,255,0.05)", border:"1px solid #7fb3e0", color:"#fff", padding:"8px", borderRadius:"6px", marginBottom:8, fontFamily:"monospace", fontSize:"12px"}}
+            />
+            <div style={{display:"flex",gap:6,overflowX:"auto",scrollbarWidth:"none"}}>
+              {[{id:"scan",l:"АНАЛИЗ"},{id:"multi",l:"МУЛЬТИ"},{id:"alerts",l:"АЛЕРТЫ"},{id:"history",l:"ИСТОРИЯ"}].map(t=>(
+                <div key={t.id} onClick={()=>setTab(t.id)} style={{padding:"6px 11px",borderRadius:7,fontFamily:"monospace",fontSize:10,cursor:"pointer",background:tab===t.id?"rgba(34,204,136,.14)":"transparent",color:tab===t.id?"#22dd88":"#8899aa",border:`1px solid ${tab===t.id?"rgba(34,204,136,.38)":"transparent"}`,fontWeight:tab===t.id?700:500}}>{t.l}</div>
+              ))}
+            </div>
+          </div>
+
+          <div style={{padding:"12px"}}>
+            {tab==="scan"&&(
+              <>
+                <div style={{display:"flex",gap:7,overflowX:"auto",marginBottom:12}}>
+                  {PAIRS.map(p=>( <div key={p} onClick={()=>{setPair(p);pairRef.current=p;setResult(null);}} style={{padding:"8px 14px",background:p===pair?"rgba(34,204,136,.15)":"rgba(17,29,42,.9)",border:`1px solid ${p===pair?"rgba(34,204,136,.58)":"rgba(100,160,220,.18)"}`,borderRadius:20,fontFamily:"monospace",fontSize:12,color:p===pair?"#22dd88":"#aabbcc",cursor:"pointer"}}>{p}</div> ))}
+                </div>
+
+                <div style={{display:"flex",gap:6,marginBottom:10}}>
+                  {[{id:"quick",l:"⚡ БЫСТРЫЙ"},{id:"deep",l:"🔬 ГЛУБОКИЙ"}].map(m=>( <div key={m.id} onClick={()=>setMode(m.id)} style={{flex:1,padding:"10px",textAlign:"center",borderRadius:10,cursor:"pointer",background:mode===m.id?"rgba(34,204,136,.12)":"rgba(17,29,42,.8)",border:`1px solid ${mode===m.id?"rgba(34,204,136,.45)":"rgba(100,160,220,.13)"}`,color:mode===m.id?"#22dd88":"#8899aa"}}>{m.l}</div> ))}
+                </div>
+
+                {error&&<div style={{background:"rgba(255,68,85,.09)",border:"1px solid #ffaaaa",padding:10,marginBottom:10,color:"#ffaaaa",fontSize:12}}>⚠ {error}</div>}
+                
+                {loading&&<div style={{textAlign:"center",padding:"20px",color:"#22cc88",fontFamily:"monospace"}}>Анализирую {".".repeat(dots)}</div>}
+
+                {result&&!loading&&(
+                  <>
+                    {result.mode==="deep"?(
+                      <>
+                        <MarketRegimeCard regime={result.market_regime}/>
+                        <ConfidenceMeter score={result.confidence?.score} breakdown={result.confidence?.breakdown}/>
+                        {result.no_trade&&<NoTradeCard noTrade={result.no_trade}/>}
+                        <OBFVGChart obfvg={result.ob_fvg} buy={result.buy} sell={result.sell}/>
+                        <SetupCard data={result.buy} isBuy={true} onAddAlert={addAlert} pair={pair}/>
+                        <SetupCard data={result.sell} isBuy={false} onAddAlert={addAlert} pair={pair}/>
+                      </>
+                    ):(
+                      <>
+                        {result.signal==="no_trade"?<NoTradeCard noTrade={{reason:"Нет сетапа"}}/>:<SetupCard data={mapQuickToSetup(result)} isBuy={result.signal==="buy"} onAddAlert={addAlert} pair={pair}/>}
+                      </>
+                    )}
+                  </>
+                )}
+              </>
+            )}
+
+            {tab==="multi"&&(
+              <>
+                {multiLoading&&<div style={{textAlign:"center",padding:20,color:"#7fb3e0"}}>Идет мульти-скан...</div>}
+                {!multiLoading&&multiResults.map((d,i)=><QuickSignalCard key={i} data={d} onDeepScan={deepScanFromMulti}/>)}
+              </>
+            )}
+            {tab==="history"&&history.map((h,i)=><div key={i} style={{padding:10,borderBottom:"1px solid #334",fontFamily:"monospace"}}>{h.time} | {h.pair} | {h.mode}</div>)}
+            {tab==="alerts"&&alerts.map((a,i)=><div key={i} style={{padding:10,borderBottom:"1px solid #334",fontFamily:"monospace"}}>🔔 {a.pair} - {a.direction.toUpperCase()} ZONE: {a.zone}</div>)}
+          </div>
+
+          <div style={{position:"fixed",bottom:0,left:0,right:0,background:"#060c14",borderTop:"1px solid #334",padding:"10px"}}>
+            <div style={{display:"flex",gap:8}}>
+              <button onClick={scan} disabled={loading} style={{flex:2,height:50,background:"#1a4",color:"#000",fontWeight:"bold",borderRadius:8,border:"none"}}>{loading?"...":"◈ СКАНИРОВАТЬ"}</button>
+              <button onClick={()=>{setTab("multi");scanAll();}} disabled={multiLoading} style={{flex:1,height:50,background:"#246",color:"#fff",fontWeight:"bold",borderRadius:8,border:"none"}}>⚡ ВСЕ</button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     const root = ReactDOM.createRoot(document.getElementById('root'));
     root.render(<App />);
   </script>
