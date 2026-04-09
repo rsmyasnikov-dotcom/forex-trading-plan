@@ -13,7 +13,11 @@
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
   <style>
-    body { margin: 0; padding: 0; background-color: #060c14; }
+    body { margin: 0; padding: 0; background-color: #060c14; font-family: system-ui, sans-serif; color: #ccdde8; }
+    * { box-sizing: border-box; }
+    ::-webkit-scrollbar { display: none; }
+    .shimmer { animation: shimmer 1.4s infinite; background-image: linear-gradient(90deg, rgba(255,255,255,.02) 25%, rgba(255,255,255,.06) 50%, rgba(255,255,255,.02) 75%); background-size: 200% 100%; }
+    @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
   </style>
 </head>
 <body>
@@ -31,7 +35,7 @@
         const out={};
         for(const pair of pairs){
           try{
-            const [b,q]=pair.split("/");
+            const[b,q]=pair.split("/");
             let v = q==="USD" ? 1/rates[b.toLowerCase()]
                   : b==="USD" ? rates[q.toLowerCase()]
                   : rates[q.toLowerCase()]/rates[b.toLowerCase()];
@@ -134,8 +138,6 @@
       if (!price || isNaN(price)) price = 1.0;
       const p = parseFloat(price);
       const isJPY = pair.includes("JPY");
-      const dec = isJPY ? 3 : 5;
-      const pip = isJPY ? 0.01 : 0.0001;
       const fmt = v => v.toFixed(isJPY ? 3 : 4);
 
       const seed = Math.floor(p * 10000) % 1000;
@@ -148,88 +150,47 @@
       const roundStep = isJPY ? 0.5 : 0.005;
       const nearRes = Math.ceil(p / roundStep) * roundStep;
       const nearSup = Math.floor(p / roundStep) * roundStep;
-      const res2 = nearRes + roundStep;
-      const sup2 = nearSup - roundStep;
-
       const distToRes = nearRes - p;
       const distToSup = p - nearSup;
       const bias = distToRes < distToSup ? "sell" : "buy"; 
-      const regimes = ["pullback","trend","range","expansion"];
-      const regime = regimes[seed % 4];
-      const subtypes = ["bullish_trend","bearish_trend","range","pullback"];
-      const subtype = bias === "buy" ? "bullish_trend" : "bearish_trend";
-      const conf = rndI(52, 74);
-
-      const buySL   = parseFloat(fmt(nearSup - atr * 1.5));
-      const buyEntry= parseFloat(fmt(nearSup + atr * 0.3));
-      const buyTP1  = parseFloat(fmt(buyEntry + Math.abs(buyEntry - buySL) * 2.2));
-      const buyTP2  = parseFloat(fmt(buyEntry + Math.abs(buyEntry - buySL) * 3.2));
-      const sellSL  = parseFloat(fmt(nearRes + atr * 1.5));
-      const sellEntry= parseFloat(fmt(nearRes - atr * 0.3));
-      const sellTP1 = parseFloat(fmt(sellEntry - Math.abs(sellSL - sellEntry) * 2.2));
-      const sellTP2 = parseFloat(fmt(sellEntry - Math.abs(sellSL - sellEntry) * 3.2));
-
-      const buyConf  = bias === "buy"  ? rndI(62, 76) : rndI(38, 52);
-      const sellConf = bias === "sell" ? rndI(62, 76) : rndI(38, 52);
-
-      const hour = new Date().getHours();
-      const session = hour >= 10 && hour < 19 ? "Лондон 10:00–19:00 МСК"
-                    : hour >= 16 && hour < 24 ? "Нью-Йорк 16:00–00:00 МСК"
-                    : "Азия 03:00–12:00 МСК";
+      
+      const buySL = parseFloat(fmt(nearSup - atr * 1.5));
+      const buyEntry = parseFloat(fmt(nearSup + atr * 0.3));
+      const sellSL = parseFloat(fmt(nearRes + atr * 1.5));
+      const sellEntry = parseFloat(fmt(nearRes - atr * 0.3));
 
       const base = {
         mode: isDeep ? "deep" : "quick",
         context: `${pair}: ${fmt(p)} — технический анализ (офлайн-режим)`,
-        _offline: true,
-        signal: bias,
-        confidence: conf,
+        _offline: true, signal: bias, confidence: rndI(52, 74),
         entry_num: bias === "buy" ? buyEntry : sellEntry,
         entry_zone: bias === "buy" ? `${fmt(nearSup)}-${fmt(buyEntry)}` : `${fmt(sellEntry)}-${fmt(nearRes)}`,
         sl_num: bias === "buy" ? buySL : sellSL,
         sl: bias === "buy" ? fmt(buySL) : fmt(sellSL),
-        tp1_num: bias === "buy" ? buyTP1 : sellTP1,
-        tp1: bias === "buy" ? fmt(buyTP1) : fmt(sellTP1),
-        tp2_num: bias === "buy" ? buyTP2 : sellTP2,
-        tp2: bias === "buy" ? fmt(buyTP2) : fmt(sellTP2),
-        regime,
-        reason: `Цена у ${bias === "buy" ? "поддержки" : "сопротивления"} ${fmt(bias === "buy" ? nearSup : nearRes)}. Ближайший ${bias === "buy" ? "резист" : "поддержка"} — ${fmt(bias === "buy" ? nearRes : nearSup)}.`,
-        news_risk: "medium",
-        no_trade_reason: null,
+        tp1_num: bias === "buy" ? buyEntry + atr*3 : sellEntry - atr*3,
+        regime: "range", news_risk: "medium"
       };
 
-      if (!isDeep) return base;
-
+      if(!isDeep) return base;
       return {
         ...base,
-        market_regime: { type: regime === "range" ? "range" : "trend", subtype, description: `Цена ${fmt(p)} — ${bias === "buy" ? "ближе к поддержке" : "ближе к сопротивлению"} ${fmt(bias === "buy" ? nearSup : nearRes)}`, score: conf, dxy_bias: pair.includes("USD") ? "DXY — нейтральный (офлайн)" : "N/A" },
-        confidence: { score: conf, breakdown: { MTF: rndI(50,75), "Структура": rndI(50,75), "OB/FVG": rndI(45,70), "Новости": rndI(40,65), DXY: rndI(45,70) } },
-        sr_levels:[
-          { type: "resistance", price: fmt(nearRes), price_num: nearRes, strength: 4, description: "Ближайшее круглое сопротивление" },
-          { type: "resistance", price: fmt(res2),    price_num: res2,    strength: 3, description: "Следующее сопротивление" },
-          { type: "support",    price: fmt(nearSup), price_num: nearSup, strength: 4, description: "Ближайшая круглая поддержка" },
-          { type: "support",    price: fmt(sup2),    price_num: sup2,    strength: 3, description: "Следующая поддержка" },
-        ],
-        ob_fvg: { bullish_ob:[{ high: parseFloat(fmt(nearSup + atr*0.5)), low: parseFloat(fmt(nearSup - atr*0.5)), strength: 3, description: "OB у поддержки" }], bearish_ob:[{ high: parseFloat(fmt(nearRes + atr*0.5)), low: parseFloat(fmt(nearRes - atr*0.5)), strength: 3, description: "OB у сопротивления" }], fvg_up: [], fvg_down:[] },
-        buy: { entry_zone: `${fmt(nearSup)}-${fmt(buyEntry)}`, entry_num: buyEntry, stop_loss: fmt(buySL), sl_num: buySL, sl_reasoning: "Ниже поддержки", tp1: fmt(buyTP1), tp1_num: buyTP1, tp2: fmt(buyTP2), tp2_num: buyTP2, confidence: buyConf, pattern: "Отбой от поддержки", reasoning: `Цена у уровня ${fmt(nearSup)}, потенциал до ${fmt(nearRes)}` },
-        sell: { entry_zone: `${fmt(sellEntry)}-${fmt(nearRes)}`, entry_num: sellEntry, stop_loss: fmt(sellSL), sl_num: sellSL, sl_reasoning: "Выше сопротивления", tp1: fmt(sellTP1), tp1_num: sellTP1, tp2: fmt(sellTP2), tp2_num: sellTP2, confidence: sellConf, pattern: "Отбой от сопротивления", reasoning: `Цена у уровня ${fmt(nearRes)}, потенциал до ${fmt(nearSup)}` },
-        mtf: { h1: { trend: bias === "buy" ? "bull" : "bear", structure: "Определяется по уровням", ema: "офлайн-режим" }, h4: { trend: bias === "buy" ? "bull" : "bear", structure: "Определяется по уровням", ema: "офлайн-режим" }, daily: { trend: "neutral", structure: "Нет данных", ema: "офлайн-режим" }, weekly: { trend: "neutral", structure: "Нет данных", ema: "офлайн-режим" }, signal: bias === "buy" ? "weak_buy" : "weak_sell", aligned: 2, signal_text: "Офлайн-режим: только уровневый анализ" },
-        news: { summary: "Офлайн-режим: нет данных по новостям", safe_window: "Проверь календарь вручную", events:[] },
-        tips: { best_session: session, confirmation: "Закрытие H1 свечи от уровня", avoid: "Входить без подтверждения и до выхода новостей", checklist:["Цена у OB/поддержки", "H1 свеча подтвердила", "Нет новостей 30 мин", "R:R от 2.2:1"], max_trades: "Максимум 2 сделки в день" },
-        no_trade: null,
+        market_regime: { type: "range", subtype: "range", description: "Локальный расчет поддержки/сопротивления", score: 60 },
+        buy: { entry_num: buyEntry, sl_num: buySL, tp1_num: buyEntry + atr*3, confidence: 60, entry_zone: `${fmt(nearSup)}-${fmt(buyEntry)}` },
+        sell: { entry_num: sellEntry, sl_num: sellSL, tp1_num: sellEntry - atr*3, confidence: 60, entry_zone: `${fmt(sellEntry)}-${fmt(nearRes)}` }
       };
     }
 
     function offlineMultiAnalysis(pairs, prices) {
       return pairs.map(pair => {
         const r = offlineAnalysis(pair, prices[pair] || null, false);
-        return { pair, signal: r.signal, confidence: r.confidence, entry_num: r.entry_num, entry_zone: r.entry_zone, sl_num: r.sl_num, tp1_num: r.tp1_num, context: r.context, regime: r.regime, news_risk: r.news_risk, _offline: true };
+        return { pair, signal: r.signal, confidence: r.confidence, entry_num: r.entry_num, entry_zone: r.entry_zone, sl_num: r.sl_num, tp1_num: r.tp1_num, context: r.context, regime: r.regime };
       });
     }
 
     // ─── PROMPTS ─────────────────────────────────────────────────────────────────
     function buildDeepPrompt(pair, dateStr, timeStr, livePrice=null) {
       const priceNote = livePrice ? `CURRENT LIVE PRICE: ${pair} = ${livePrice}. Use this exact price.` : `Use your best current knowledge for ${pair} price.`;
-      return `Respond ONLY with a raw JSON object. No markdown, no text outside JSON.\n\n${priceNote}\n\nYou are a senior Forex analyst. Date: ${dateStr}, ${timeStr} MSK. Pair: ${pair}.\n\nAnalyze: D1+H4+H1 structure, Order Block, FVG, liquidity zones, DXY (if USD pair), market regime.\nRules: entry only at OB/FVG/SR. SL behind invalidation. TP1>=2.2R, TP2>=3.2R. No setup→no_trade.\n\nJSON ONLY (no markdown). Fill with real analysis in Russian:\n{"mode":"deep","context":"цена+ситуация","market_regime":{"type":"trend","subtype":"bullish_trend","description":"кратко","score":70,"dxy_bias":"кратко"},"confidence":{"score":70,"breakdown":{"MTF":70,"Структура":70,"OB/FVG":70,"Новости":70,"DXY":70}},"sr_levels":[{"type":"resistance","price":"X","price_num":0,"strength":3,"description":"кратко"}],"ob_fvg":{"bullish_ob":[{"high":0,"low":0,"strength":3,"description":"кратко"}],"bearish_ob":[],"fvg_up":[],"fvg_down":[]},"buy":{"entry_zone":"X-Y","entry_num":0,"stop_loss":"X","sl_num":0,"sl_reasoning":"кратко","tp1":"X","tp1_num":0,"tp2":"X","tp2_num":0,"confidence":70,"pattern":"кратко","reasoning":"кратко"},"sell":{"entry_zone":"X-Y","entry_num":0,"stop_loss":"X","sl_num":0,"sl_reasoning":"кратко","tp1":"X","tp1_num":0,"tp2":"X","tp2_num":0,"confidence":50,"pattern":"кратко","reasoning":"кратко"},"mtf":{"h1":{"trend":"bull","structure":"кратко","ema":"кратко"},"h4":{"trend":"bull","structure":"кратко","ema":"кратко"},"daily":{"trend":"bull","structure":"кратко","ema":"кратко"},"weekly":{"trend":"bull","structure":"кратко","ema":"кратко"},"signal":"weak_buy","aligned":3,"signal_text":"кратко"},"news":{"summary":"кратко","safe_window":"HH:MM-HH:MM МСК","events":[]},"tips":{"best_session":"кратко","confirmation":"кратко","avoid":"кратко","checklist":["пункт"],"max_trades":"кратко"},"no_trade":null}`;
+      return `Respond ONLY with a raw JSON object. No markdown.\n\n${priceNote}\n\nYou are a senior Forex analyst. Date: ${dateStr}, ${timeStr} MSK. Pair: ${pair}.\n\nAnalyze: D1+H4+H1 structure, Order Block, FVG, liquidity zones, DXY (if USD pair), market regime.\nRules: entry only at OB/FVG/SR. SL behind invalidation. TP1>=2.2R, TP2>=3.2R. No setup→no_trade.\n\nJSON ONLY. Fill with real analysis in Russian:\n{"mode":"deep","context":"цена+ситуация","market_regime":{"type":"trend","subtype":"bullish_trend","description":"кратко","score":70,"dxy_bias":"кратко"},"confidence":{"score":70,"breakdown":{"MTF":70,"Структура":70,"OB/FVG":70,"Новости":70,"DXY":70}},"sr_levels":[{"type":"resistance","price":"X","price_num":0,"strength":3,"description":"кратко"}],"ob_fvg":{"bullish_ob":[{"high":0,"low":0,"strength":3,"description":"кратко"}],"bearish_ob":[],"fvg_up":[],"fvg_down":[]},"buy":{"entry_zone":"X-Y","entry_num":0,"stop_loss":"X","sl_num":0,"sl_reasoning":"кратко","tp1":"X","tp1_num":0,"tp2":"X","tp2_num":0,"confidence":70,"pattern":"кратко","reasoning":"кратко"},"sell":{"entry_zone":"X-Y","entry_num":0,"stop_loss":"X","sl_num":0,"sl_reasoning":"кратко","tp1":"X","tp1_num":0,"tp2":"X","tp2_num":0,"confidence":50,"pattern":"кратко","reasoning":"кратко"},"mtf":{"h1":{"trend":"bull","structure":"кратко","ema":"кратко"},"h4":{"trend":"bull","structure":"кратко","ema":"кратко"},"daily":{"trend":"bull","structure":"кратко","ema":"кратко"},"weekly":{"trend":"bull","structure":"кратко","ema":"кратко"},"signal":"weak_buy","aligned":3,"signal_text":"кратко"},"news":{"summary":"кратко","safe_window":"HH:MM-HH:MM МСК","events":[]},"tips":{"best_session":"кратко","confirmation":"кратко","avoid":"кратко","checklist":["пункт"],"max_trades":"кратко"},"no_trade":null}`;
     }
 
     function buildQuickPrompt(pair, dateStr, timeStr, livePrice=null) {
@@ -243,7 +204,7 @@
     }
 
     // ─── Компоненты UI ─────────────────────────────────────────────────────────────
-    function OBFVGChart({ obfvg, buy, sell }) { /* Тот же код */
+    function OBFVGChart({ obfvg, buy, sell }) {
       const levels=[];
       if(buy){levels.push(buy.sl_num,buy.entry_num,buy.tp1_num,buy.tp2_num);}
       if(sell){levels.push(sell.sl_num,sell.entry_num,sell.tp1_num,sell.tp2_num);}
@@ -253,27 +214,31 @@
       obfvg?.fvg_down?.forEach(f=>{levels.push(f.high,f.low);});
       const valid=levels.filter(v=>v&&!isNaN(Number(v))&&Number(v)>0).map(Number);
       if(valid.length<2) return null;
+      
       const mn=Math.min(...valid), mx=Math.max(...valid);
       const pad=(mx-mn)*0.08;
       const minP=mn-pad, maxP=mx+pad, range=maxP-minP||0.001;
-      const W=300,H=180;
+      
+      // Уменьшена высота (было 180, стало 120) для большей компактности
+      const W=300, H=120;
       const toY=v=>H-((Number(v)-minP)/range)*H;
       const isBuyPrimary=!sell||(buy&&sell&&(buy.confidence||0)>=(sell.confidence||0));
       const primary=isBuyPrimary?buy:sell;
       const pColor=isBuyPrimary?"#22cc88":"#ff5566";
+      
       return (
-        <div style={{background:"rgba(10,16,26,.95)",border:"1px solid rgba(100,160,220,.18)",borderRadius:12,padding:"12px 14px",marginBottom:12}}>
-          <div style={{fontFamily:"'Courier New',monospace",fontSize:10,color:"#aabbdd",letterSpacing:"2px",marginBottom:10,fontWeight:700}}>КАРТА ЗОН · ORDER BLOCK / FVG / УРОВНИ</div>
+        <div style={{background:"rgba(10,16,26,.95)",border:"1px solid rgba(100,160,220,.18)",borderRadius:12,padding:"10px 12px",marginBottom:12}}>
+          <div style={{fontFamily:"'Courier New',monospace",fontSize:9,color:"#aabbdd",letterSpacing:"2px",marginBottom:6,fontWeight:700}}>КАРТА ЗОН · OB / FVG</div>
           <div style={{overflowX:"auto"}}>
-          <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{overflow:"visible",display:"block",minWidth:260}}>
+          <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{overflow:"visible",display:"block",minWidth:260, maxHeight:"130px"}}>
             {[0,.25,.5,.75,1].map(t=>( <line key={t} x1={32} y1={H*t} x2={W} y2={H*t} stroke="rgba(255,255,255,.05)" strokeWidth="0.5"/> ))}
             {obfvg?.bullish_ob?.map((ob,i)=>{
               const y1=toY(ob.high),y2=toY(ob.low),h=Math.max(3,y2-y1);
-              return <g key={`bob${i}`}><rect x={32} y={y1} width={W-32} height={h} fill="rgba(34,204,136,.16)" stroke="rgba(34,204,136,.6)" strokeWidth="1" strokeDasharray="4,2"/><text x={34} y={y1-2} fill="rgba(68,220,150,.9)" fontSize="7.5" fontFamily="Courier New,monospace" fontWeight="bold">OB↑</text></g>;
+              return <g key={`bob${i}`}><rect x={32} y={y1} width={W-32} height={h} fill="rgba(34,204,136,.16)" stroke="rgba(34,204,136,.6)" strokeWidth="1" strokeDasharray="4,2"/><text x={34} y={y1-2} fill="rgba(68,220,150,.9)" fontSize="7" fontFamily="Courier New,monospace" fontWeight="bold">OB↑</text></g>;
             })}
             {obfvg?.bearish_ob?.map((ob,i)=>{
               const y1=toY(ob.high),y2=toY(ob.low),h=Math.max(3,y2-y1);
-              return <g key={`seob${i}`}><rect x={32} y={y1} width={W-32} height={h} fill="rgba(255,68,85,.16)" stroke="rgba(255,68,85,.6)" strokeWidth="1" strokeDasharray="4,2"/><text x={34} y={y1-2} fill="rgba(255,100,120,.9)" fontSize="7.5" fontFamily="Courier New,monospace" fontWeight="bold">OB↓</text></g>;
+              return <g key={`seob${i}`}><rect x={32} y={y1} width={W-32} height={h} fill="rgba(255,68,85,.16)" stroke="rgba(255,68,85,.6)" strokeWidth="1" strokeDasharray="4,2"/><text x={34} y={y1-2} fill="rgba(255,100,120,.9)" fontSize="7" fontFamily="Courier New,monospace" fontWeight="bold">OB↓</text></g>;
             })}
             {obfvg?.fvg_up?.map((fvg,i)=>{
               const y1=toY(fvg.high),y2=toY(fvg.low),h=Math.max(2,y2-y1);
@@ -284,7 +249,7 @@
               return <rect key={`fvgd${i}`} x={32} y={y1} width={W-32} height={h} fill="rgba(255,68,85,.1)" stroke="rgba(255,68,85,.32)" strokeWidth="0.8"/>;
             })}
             {primary &&[ {v:primary.sl_num,c:"#ff6677",l:"SL",d:"4,3"}, {v:primary.entry_num,c:"#f0d060",l:"ENTRY",d:"none"}, {v:primary.tp1_num,c:"#22dd88",l:"TP1",d:"4,3"}, primary.tp2_num&&{v:primary.tp2_num,c:"#55ffcc",l:"TP2",d:"4,3"} ].filter(Boolean).map(({v,c,l,d})=>(
-              <g key={l}><line x1={32} y1={toY(v)} x2={W} y2={toY(v)} stroke={c} strokeWidth={l==="ENTRY"?2:1.2} strokeDasharray={d}/><text x={30} y={toY(v)+3.5} textAnchor="end" fill={c} fontSize="8" fontFamily="Courier New,monospace" fontWeight="bold">{l}</text></g>
+              <g key={l}><line x1={32} y1={toY(v)} x2={W} y2={toY(v)} stroke={c} strokeWidth={l==="ENTRY"?1.5:1} strokeDasharray={d}/><text x={30} y={toY(v)+3} textAnchor="end" fill={c} fontSize="7" fontFamily="Courier New,monospace" fontWeight="bold">{l}</text></g>
             ))}
             {primary?.entry_num&&primary?.sl_num&&( <rect x={32} y={Math.min(toY(primary.entry_num),toY(primary.sl_num))-1} width={W-32} height={Math.abs(toY(primary.entry_num)-toY(primary.sl_num))+2} fill={`${pColor}09`}/> )}
             {[0,.25,.5,.75,1].map(t=>{
@@ -348,75 +313,6 @@
       );
     }
 
-    function ConfidenceMeter({ score, breakdown }) {
-      if(!score) return null;
-      const pct=Math.min(100,Math.max(0,Number(score)));
-      const c=pct>=75?"#22cc88":pct>=55?"#f0d060":"#ff5566";
-      const lbl=pct>=75?"ВЫСОКАЯ":pct>=55?"СРЕДНЯЯ":"НИЗКАЯ";
-      return (
-        <div style={{background:"rgba(12,18,28,.9)",border:`1px solid ${c}28`,borderRadius:12,padding:"12px 14px",marginBottom:12}}>
-          <div style={{fontFamily:"'Courier New',monospace",fontSize:10,color:"#aabbdd",letterSpacing:"2px",marginBottom:10,fontWeight:700}}>AI УВЕРЕННОСТЬ В СИГНАЛЕ</div>
-          <div style={{display:"flex",alignItems:"center",gap:16}}>
-            <div style={{flex:1}}>
-              <div style={{fontFamily:"'Courier New',monospace",fontSize:12,fontWeight:700,color:c,marginBottom:7}}>УВЕРЕННОСТЬ: {lbl} ({pct}%)</div>
-              {breakdown&&Object.entries(breakdown).map(([k,v])=>(
-                <div key={k} style={{display:"flex",alignItems:"center",gap:7,marginBottom:5}}>
-                  <div style={{fontFamily:"'Courier New',monospace",fontSize:10,color:"#aabbdd",width:80,flexShrink:0}}>{k}</div>
-                  <div style={{flex:1,height:3,borderRadius:2,background:"rgba(255,255,255,.07)",overflow:"hidden"}}><div style={{height:"100%",width:`${v}%`,background:`linear-gradient(90deg,${c}88,${c})`}}/></div>
-                  <div style={{fontFamily:"'Courier New',monospace",fontSize:10,color:"#ccdde8",width:28,textAlign:"right"}}>{v}%</div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      );
-    }
-
-    function SRLevelsCard({ levels, currentPrice }) {
-      if(!levels||!levels.length) return null;
-      const sorted=[...levels].sort((a,b)=>Number(b.price_num)-Number(a.price_num));
-      const cp=Number(currentPrice);
-      return (
-        <div style={{background:"rgba(12,18,28,.9)",border:"1px solid rgba(100,160,220,.18)",borderRadius:12,padding:"12px 14px",marginBottom:12}}>
-          <div style={{fontFamily:"'Courier New',monospace",fontSize:10,color:"#aabbdd",letterSpacing:"2px",marginBottom:10,fontWeight:700}}>КЛЮЧЕВЫЕ УРОВНИ PRICE ACTION</div>
-          <div style={{display:"flex",flexDirection:"column",gap:5}}>
-            {sorted.map((lvl,i)=>{
-              const tc=lvl.type==="resistance"?"#ff6677":"#22dd88";
-              const isAbove=cp&&Number(lvl.price_num)>cp, isBelow=cp&&Number(lvl.price_num)<cp;
-              return (
-                <div key={i} style={{display:"flex",alignItems:"center",gap:8,padding:"7px 10px",borderRadius:8,background:"rgba(17,29,42,.7)",border:`1px solid ${tc}1e`}}>
-                  <div style={{width:38,fontFamily:"'Courier New',monospace",fontSize:10,fontWeight:700,color:tc}}>{lvl.type==="resistance"?"СОПР":"ПОДД"}</div>
-                  <div style={{fontFamily:"'Courier New',monospace",fontSize:14,fontWeight:700,color:isAbove?"#ff8899":isBelow?"#44eebb":"#f0d060",flex:1}}>{lvl.price}</div>
-                  <div style={{fontSize:10,color:"#ccdde8",textAlign:"right",maxWidth:100}}>{lvl.description}</div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      );
-    }
-
-    function NewsCard({ news }) {
-      if(!news||!news.events||!news.events.length) return null;
-      const ic=i=>i==="high"?"#ff6677":i==="medium"?"#f0d060":"#7799aa";
-      return (
-        <div style={{background:"rgba(14,20,32,.95)",border:"1px solid rgba(232,201,74,.18)",borderRadius:12,padding:"12px 14px",marginBottom:12}}>
-          <div style={{fontFamily:"'Courier New',monospace",fontSize:10,color:"#aabbdd",letterSpacing:"2px",marginBottom:4,fontWeight:600}}>ЭКОНОМИЧЕСКИЙ КАЛЕНДАРЬ</div>
-          <div style={{fontSize:11,color:"#ccdde8",marginBottom:10,lineHeight:1.5}}>{news.summary}</div>
-        </div>
-      );
-    }
-
-    function MTFCard({ mtf }) {
-      if(!mtf) return null;
-      return (
-        <div style={{background:"rgba(12,18,28,.9)",border:"1px solid rgba(100,160,220,.18)",borderRadius:12,padding:14,marginBottom:12}}>
-          <div style={{fontFamily:"'Courier New',monospace",fontSize:10,color:"#aabbdd",letterSpacing:"2px",marginBottom:10,fontWeight:700}}>МУЛЬТИТАЙМФРЕЙМНЫЙ АНАЛИЗ (H1·H4·D1)</div>
-          <div style={{fontFamily:"'Courier New',monospace",fontSize:12,color:"#22cc88"}}>{mtf.signal_text}</div>
-        </div>
-      );
-    }
-
     function SetupCard({ data, isBuy, onAddAlert, pair }) {
       if(!data) return null;
       const accent=isBuy?"#22dd88":"#ff6677";
@@ -442,8 +338,6 @@
         </div>
       );
     }
-
-    function TipsCard({ tips }) { return null; /* Минимальный UI */ }
 
     function QuickSignalCard({ data, onDeepScan }) {
       if(!data) return null;
@@ -472,12 +366,13 @@
       const [session,setSession]     = useState(getSession());
       const [history,setHistory]     = useState([]);
       const[tab,setTab]             = useState("scan");
-      const [mode,setMode]           = useState("deep");
+      const[mode,setMode]           = useState("deep");
       const [alerts,setAlerts]       = useState([]);
       const [multiResults,setMultiResults] = useState([]);
       const [multiLoading,setMultiLoading] = useState(false);
       const [livePrice,setLivePrice]   = useState(null);
-      const [apiKey, setApiKey]        = useState(() => localStorage.getItem("fxsp_apikey") || "");
+      const[apiKey, setApiKey]        = useState(() => localStorage.getItem("fxsp_apikey") || "");
+      const [showDataInfo, setShowDataInfo] = useState(false);
       const pairRef=useRef(pair);
       pairRef.current=pair;
 
@@ -494,26 +389,53 @@
       const saveApiKey=k=>{setApiKey(k);try{localStorage.setItem("fxsp_apikey",k);}catch(_){}};
 
       const doFetch=async(prompt,tokens=2000,parseAsArray=false)=>{
-        if(!apiKey) throw new Error("Укажите Anthropic API Key (sk-ant-...) в поле выше!");
+        if(!apiKey) throw new Error("Укажите API Key (AIza... для Gemini или sk-ant... для Claude) в поле выше!");
+        
+        const isGemini = apiKey.startsWith("AIza");
         const controller=new AbortController();
-        const timer=setTimeout(()=>controller.abort(),25000);
+        const timer=setTimeout(()=>controller.abort(), 25000);
+        
         try{
-          const res=await fetch("https://api.anthropic.com/v1/messages",{
-            signal:controller.signal,
-            method:"POST",
-            headers:{
-              "Content-Type":"application/json",
-              "x-api-key": apiKey,
-              "anthropic-version": "2023-06-01",
-              "anthropic-dangerously-allow-browser": "true" // Включаем возможность делать запросы из браузера
-            },
-            body:JSON.stringify({model:"claude-3-5-haiku-20241022",max_tokens:tokens,messages:[{role:"user",content:prompt}]})
-          });
-          if(!res.ok){ const txt=await res.text(); throw new Error(`HTTP ${res.status}: ${txt.slice(0,100)}`); }
-          const data=await res.json();
-          if(data.error) throw new Error(data.error.message||JSON.stringify(data.error));
-          const raw=(data.content||[]).map(b=>b.type==="text"?b.text:"").join("").trim();
-          return parseAsArray ? extractJSONArray(raw) : extractJSON(raw);
+          let data, rawText;
+
+          if (isGemini) {
+            // Запрос к Google Gemini API
+            const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
+              signal: controller.signal,
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                contents: [{ parts: [{ text: prompt }] }],
+                generationConfig: { 
+                  maxOutputTokens: tokens,
+                  responseMimeType: "application/json" // Принудительно отдаем ответ в формате JSON
+                }
+              })
+            });
+            if(!res.ok){ const txt=await res.text(); throw new Error(`HTTP ${res.status}: ${txt.slice(0,100)}`); }
+            data = await res.json();
+            if(data.error) throw new Error(data.error.message);
+            rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+          } else {
+            // Запрос к Anthropic Claude API
+            const res = await fetch("https://api.anthropic.com/v1/messages", {
+              signal: controller.signal,
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "x-api-key": apiKey,
+                "anthropic-version": "2023-06-01",
+                "anthropic-dangerously-allow-browser": "true"
+              },
+              body: JSON.stringify({ model: "claude-3-5-haiku-20241022", max_tokens: tokens, messages:[{ role: "user", content: prompt }] })
+            });
+            if(!res.ok){ const txt=await res.text(); throw new Error(`HTTP ${res.status}: ${txt.slice(0,100)}`); }
+            data = await res.json();
+            if(data.error) throw new Error(data.error.message);
+            rawText = (data.content ||[]).map(b => b.type === "text" ? b.text : "").join("").trim();
+          }
+
+          return parseAsArray ? extractJSONArray(rawText) : extractJSON(rawText);
         }catch(e){
           if(e.name==="AbortError") throw new Error("Таймаут. Попробуйте ещё раз.");
           throw e;
@@ -573,6 +495,8 @@
       const addAlert=async a=>saveAlerts([a,...alerts].slice(0,10));
       const deepScanFromMulti=p=>{setPair(p);pairRef.current=p;setMode("deep");setTab("scan");setResult(null);};
 
+      const activeModelLabel = apiKey.startsWith("AIza") ? "🤖 Gemini AI" : (apiKey.startsWith("sk-ant") ? "🤖 Claude AI" : "Не выбран");
+
       return (
         <div style={{minHeight:"100vh",color:"#ccdde8",fontFamily:"system-ui,sans-serif",paddingBottom:100}}>
           {/* Header */}
@@ -581,14 +505,32 @@
               <div style={{fontFamily:"'Courier New',monospace",fontSize:14,color:"#eef5ff",fontWeight:700}}>FX SCANNER PRO</div>
               <div style={{fontFamily:"'Courier New',monospace",fontSize:12,color:"#eef5ff",fontWeight:700}}>{clock}</div>
             </div>
+            
             {/* Настройки ключа API */}
-            <input 
-              type="password" 
-              placeholder="Вставьте Anthropic API Key (sk-ant-...)" 
-              value={apiKey} 
-              onChange={e=>saveApiKey(e.target.value)}
-              style={{width:"100%", background:"rgba(255,255,255,0.05)", border:"1px solid #7fb3e0", color:"#fff", padding:"8px", borderRadius:"6px", marginBottom:8, fontFamily:"monospace", fontSize:"12px"}}
-            />
+            <div style={{position:"relative"}}>
+              <input 
+                type="password" 
+                placeholder="Вставьте API Key (AIza... или sk-ant...)" 
+                value={apiKey} 
+                onChange={e=>saveApiKey(e.target.value)}
+                style={{width:"100%", background:"rgba(255,255,255,0.05)", border:"1px solid #7fb3e0", color:"#fff", padding:"8px 10px", borderRadius:"6px", marginBottom:4, fontFamily:"monospace", fontSize:"12px"}}
+              />
+              <div style={{display: "flex", justifyContent: "space-between", fontSize: "10px", color: "#8899aa", marginBottom: "8px", padding: "0 4px"}}>
+                <span>Активная модель: <b style={{color: apiKey ? "#22dd88" : "#ff7788"}}>{activeModelLabel}</b></span>
+                <span onClick={()=>setShowDataInfo(!showDataInfo)} style={{cursor: "pointer", textDecoration: "underline"}}>Откуда берутся данные?</span>
+              </div>
+
+              {/* Блок информации об источниках */}
+              {showDataInfo && (
+                <div style={{background:"rgba(17,29,42,.9)", border:"1px solid rgba(100,160,220,.2)", borderRadius:"8px", padding:"10px", fontSize:"10px", color:"#ccdde8", lineHeight:1.5, marginBottom:"10px"}}>
+                  <strong style={{color:"#7fb3e0"}}>Откуда данные в приложении?</strong><br/>
+                  • <b>Цены (Котировки):</b> Загружаются в реальном времени напрямую из открытых API (Yahoo Finance, currency-api).<br/>
+                  • <b>Анализ и зоны (OB/FVG):</b> Формируются искусственным интеллектом (Claude или Google Gemini). Приложение отправляет ИИ текущую цену и специальный промпт с правилами трейдинга, а ИИ возвращает математически выверенные зоны входа.<br/>
+                  • <b>Офлайн-режим:</b> Если API ключ не указан или нет доступа к серверам ИИ, работает встроенный локальный алгоритм. Он рассчитывает зоны поддержки/сопротивления математически на основе показателя волатильности (ATR) и круглых ценовых уровней.
+                </div>
+              )}
+            </div>
+
             <div style={{display:"flex",gap:6,overflowX:"auto",scrollbarWidth:"none"}}>
               {[{id:"scan",l:"АНАЛИЗ"},{id:"multi",l:"МУЛЬТИ"},{id:"alerts",l:"АЛЕРТЫ"},{id:"history",l:"ИСТОРИЯ"}].map(t=>(
                 <div key={t.id} onClick={()=>setTab(t.id)} style={{padding:"6px 11px",borderRadius:7,fontFamily:"monospace",fontSize:10,cursor:"pointer",background:tab===t.id?"rgba(34,204,136,.14)":"transparent",color:tab===t.id?"#22dd88":"#8899aa",border:`1px solid ${tab===t.id?"rgba(34,204,136,.38)":"transparent"}`,fontWeight:tab===t.id?700:500}}>{t.l}</div>
@@ -616,7 +558,6 @@
                     {result.mode==="deep"?(
                       <>
                         <MarketRegimeCard regime={result.market_regime}/>
-                        <ConfidenceMeter score={result.confidence?.score} breakdown={result.confidence?.breakdown}/>
                         {result.no_trade&&<NoTradeCard noTrade={result.no_trade}/>}
                         <OBFVGChart obfvg={result.ob_fvg} buy={result.buy} sell={result.sell}/>
                         <SetupCard data={result.buy} isBuy={true} onAddAlert={addAlert} pair={pair}/>
