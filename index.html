@@ -124,7 +124,7 @@
                 <div class="status-dot"></div>
                 <div>
                     <div class="logo-title courier">FX SCANNER PRO</div>
-                    <div class="logo-subtitle courier">DUAL AI ENGINE</div>
+                    <div class="logo-subtitle courier">ДВА AI-ДВИЖКА</div>
                 </div>
             </div>
             <div class="time-info">
@@ -225,7 +225,11 @@ async function fetchAnalysisFromClaude(apiKey, pair) {
 }
 
 async function fetchAnalysisFromGemini(apiKey, pair) {
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`, {
+    // ИСПРАВЛЕНИЕ: Используем правильное имя модели 'gemini-1.5-flash'
+    const modelName = 'gemini-1.5-flash';
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
+    
+    const response = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -238,6 +242,10 @@ async function fetchAnalysisFromGemini(apiKey, pair) {
         throw new Error(`Ошибка API Gemini: ${response.status} - ${err.error?.message || 'Неизвестная ошибка'}`);
     }
     const data = await response.json();
+    // Проверяем, что ответ не пустой
+    if (!data.candidates || !data.candidates[0].content.parts || !data.candidates[0].content.parts[0].text) {
+        throw new Error("API Gemini вернул пустой ответ. Возможно, контент был заблокирован фильтрами безопасности.");
+    }
     return JSON.parse(data.candidates[0].content.parts[0].text);
 }
 
@@ -245,10 +253,6 @@ async function fetchAnalysisFromGemini(apiKey, pair) {
 // ===================================================================================
 // ─── UI КОМПОНЕНТЫ ───────────────────────────────────────────────────────────────
 // ===================================================================================
-function createSetupCard(data, isBuy) { /* ... без изменений ... */ }
-function createNoTradeCard(data) { /* ... без изменений ... */ }
-// Код для createSetupCard и createNoTradeCard остается тем же, что и в предыдущем ответе.
-// Я вставлю его сюда для полноты, чтобы вы могли скопировать один блок.
 function createSetupCard(data, isBuy) {
     if (!data) return '';
     const rr = (Math.abs(data.tp1_num - data.entry_num) / Math.abs(data.entry_num - data.sl_num)).toFixed(2);
@@ -280,16 +284,11 @@ document.addEventListener("DOMContentLoaded", () => {
     const aiSelectors = document.querySelectorAll('input[name="ai_engine"]');
 
     function init() {
-        // Загрузка ключей из localStorage
         claudeApiInputEl.value = localStorage.getItem('claudeApiKey') || '';
         geminiApiInputEl.value = localStorage.getItem('geminiApiKey') || '';
-
-        // Настройка UI
         pairSelectorEl.innerHTML = PAIRS.map(p => `<button class="pair-button courier ${p === currentPair ? 'active' : ''}" data-pair="${p}">${p}</button>`).join('');
         setInterval(updateTime, 1000);
         updateTime();
-
-        // Обработчики событий
         pairSelectorEl.addEventListener('click', e => {
             if (e.target.classList.contains('pair-button')) {
                 currentPair = e.target.dataset.pair;
@@ -299,11 +298,8 @@ document.addEventListener("DOMContentLoaded", () => {
                 outputContainerEl.innerHTML = '';
             }
         });
-        
         scanButtonEl.addEventListener('click', runScan);
-        
         aiSelectors.forEach(radio => radio.addEventListener('change', toggleApiInput));
-        
         claudeApiInputEl.addEventListener('input', e => localStorage.setItem('claudeApiKey', e.target.value));
         geminiApiInputEl.addEventListener('input', e => localStorage.setItem('geminiApiKey', e.target.value));
     }
@@ -316,7 +312,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
     async function runScan() {
         if (isLoading) return;
-
         const selectedAi = document.querySelector('input[name="ai_engine"]:checked').value;
         const apiKey = selectedAi === 'claude' ? claudeApiInputEl.value : geminiApiInputEl.value;
 
@@ -378,4 +373,6 @@ document.addEventListener("DOMContentLoaded", () => {
 </script>
 
 </body>
-</html>
+</html>```
+
+Теперь все должно работать как часы. Ошибка 404 для Gemini исправлена, а интерфейс полностью на русском. Удачи в анализе
